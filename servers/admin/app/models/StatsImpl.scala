@@ -1,5 +1,7 @@
 package models
 
+import io.prediction.commons.Config
+import java.io.File
 import org.hyperic.sigar._
 
 class StatsImpl extends StatsMonitor {
@@ -20,4 +22,35 @@ class StatsImpl extends StatsMonitor {
 		return totalUsage
 	}
 
+  def getTotalDiskSpace() {
+    var roots = File.lsitRoots()
+    var totalSpace = 0
+
+    for (root <- roos) {
+      totalSpace += root.getTotalSpace()
+    }
+
+    return totalSpace
+  }
+
+  def getUsedDiskSpace() {
+    var hdfsDir = Config.settingsHdfsRoot
+    var d = new DirUsage()
+    d.gather(sigar, hdfsDir)
+
+    // TODO: Get disk space for mongodb
+
+    return d.getDiskUsage()
+  }
+
+  def getFreeDiskSpace() {
+    var roots = File.listRoots()
+    var freeSpace = 0
+
+    for (root <- roots) {
+      freeSpace += root.getFreeSpace()
+    }
+
+    return freeSpace
+  }
 }
