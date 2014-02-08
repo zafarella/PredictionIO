@@ -18,7 +18,7 @@ trait StatsMonitor {
    * @param pid
    * 			process id of given process
    */
-  def getProcessRamUsage(pid: Int): Double
+  def getProcessRamUsage(pid: Long): Double
 
   /**
    * Get CPU usage in percent for particular process
@@ -26,7 +26,7 @@ trait StatsMonitor {
    * @param pid
    * 			process id of given process
    */
-  def getProcessCpuUsage(pid: Int): Double
+  def getProcessCpuUsage(pid: Long): Double
 
   /**
    * Get total Disk Space

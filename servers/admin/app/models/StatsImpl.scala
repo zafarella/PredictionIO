@@ -4,37 +4,51 @@ import io.prediction.commons.Config
 import java.io.File
 import org.hyperic.sigar._
 
-class StatsImpl extends StatsMonitor {
-	
-	val sigar = new Sigar()
+object StatsImpl extends StatsMonitor {
 
-	def getRamUsage() {
-		val ram = new Mem(sigar)
-		ram.gather()
-		return ram.getUsedPercent()
-	}
+  val sigar = new Sigar()
+  val config = new Config()
 
-	def getCpuUsage() {
-		val cpu = sigar.getCpuPerc()
-		var sysUsage = cpu.getSys()
-		var userUsage = cpu.getUser()
-		var totalUsage = sysUsage + userUsage
-		return totalUsage
-	}
+  def getRamUsage(): Double = {
+    val ram = new Mem()
+    ram.gather(sigar)
+    return ram.getUsedPercent()
+  }
 
-  def getTotalDiskSpace() {
+  def getCpuUsage(): Double = {
+    val cpu = sigar.getCpuPerc()
+    var sysUsage = cpu.getSys()
+    var userUsage = cpu.getUser()
+    var totalUsage = sysUsage + userUsage
+    return totalUsage
+  }
+
+  def getProcessCpuUsage(pid: Long): Double = {
+    var pc = new ProcCpu()
+    pc.gather(sigar, pid)
+
+    return pc.getPercent()
+  }
+  def getProcessRamUsage(pid: Long): Double = {
+    var pm = new ProcMem()
+    pm.gather(sigar, pid)
+
+    return pm.getSize()
+  }
+
+  def getTotalDiskSpace(): Long = {
     var roots = File.listRoots()
-    var totalSpace = 0
+    var totalSpace: Long = 0
 
-    for (root <- roos) {
-      totalSpace += root.getTotalSpace()
+    for (root <- roots) {
+      totalSpace = totalSpace + root.getTotalSpace()
     }
 
     return totalSpace
   }
 
-  def getUsedDiskSpace() {
-    var hdfsDir = Config.settingsHdfsRoot
+  def getUsedDiskSpace(): Long = {
+    var hdfsDir = config.settingsHdfsRoot
     var d = new DirUsage()
     d.gather(sigar, hdfsDir)
 
@@ -43,12 +57,12 @@ class StatsImpl extends StatsMonitor {
     return d.getDiskUsage()
   }
 
-  def getFreeDiskSpace() {
+  def getFreeDiskSpace(): Long = {
     var roots = File.listRoots()
-    var freeSpace = 0
+    var freeSpace: Long = 0
 
     for (root <- roots) {
-      freeSpace += root.getFreeSpace()
+      freeSpace = freeSpace + root.getFreeSpace()
     }
 
     return freeSpace
