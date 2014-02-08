@@ -23,7 +23,7 @@ class StatsImpl extends StatsMonitor {
 	}
 
   def getTotalDiskSpace() {
-    var roots = File.lsitRoots()
+    var roots = File.listRoots()
     var totalSpace = 0
 
     for (root <- roos) {
