@@ -23,6 +23,4 @@ GET     /apps/:appid/engines/:engineid/offlinetunes/:offlinetuneid/stop         
 
 GET     /monitor/ramUsage                         io.prediction.scheduler.StatsMonitor.getRamUsage()
 GET     /monitor/cpuUsage                         io.prediction.scheduler.StatsMonitor.getCpuUsage()
-GET     /monitor/totalDiskSpace                   io.prediction.scheduler.StatsMonitor.getTotalDiskSpace()
 GET     /monitor/usedDiskSpace                    io.prediction.scheduler.StatsMonitor.getUsedDiskSpace()
-GET     /monitor/freeDiskSpace                    io.prediction.scheduler.StatsMonitor.getFreeDiskSpace()

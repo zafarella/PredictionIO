@@ -11,7 +11,8 @@ libraryDependencies ++= Seq(
   "mysql" % "mysql-connector-java" % "5.1.22",
   "org.clapper" %% "scalasti" % "1.0.0",
   "org.quartz-scheduler" % "quartz" % "2.1.7",
-  "org.specs2" %% "specs2" % "1.14" % "test")
+  "org.specs2" %% "specs2" % "1.14" % "test",
+  "org.fusesource" % "sigar" % "1.6.4")
 
 javaOptions in Test += "-Dconfig.file=conf/test.conf"
 
