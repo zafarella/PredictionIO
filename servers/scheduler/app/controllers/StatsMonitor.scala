@@ -4,6 +4,8 @@ import io.prediction.commons.Config
 import play.api.mvc._
 import play.api.libs.json._
 import scala.collection.JavaConverters._
+import scala.collection.Seq
+import scala.sys.process._
 import org.hyperic.sigar._
 import org.hyperic.sigar.ptql._
 
@@ -14,6 +16,14 @@ object StatsMonitor extends Controller {
   val sigar = new Sigar
   val pids = getPIDs
   val config = new Config
+  val hosts = Seq(
+        config.appdataDbHost+":"+config.appdataDbPort+"/"+config.appdataDbName,
+        config.appdataTrainingDbHost+":"+config.appdataTrainingDbPort+"/"+config.appdataTrainingDbName,
+        config.appdataValidationDbHost+":"+config.appdataValidationDbPort+"/"+config.appdataValidationDbName,
+        config.modeldataDbHost+":"+config.modeldataDbPort+"/"+config.modeldataDbName,
+        config.modeldataTrainingDbHost+":"+config.modeldataTrainingDbPort+"/"+config.modeldataTrainingDbName,
+        config.settingsDbHost+":"+config.settingsDbPort+"/"+config.settingsDbName
+        ) distinct
   
   def getPIDs: Array[Long] = {
     val procFinder = new ProcessFinder(sigar)
@@ -71,7 +81,16 @@ object StatsMonitor extends Controller {
     
     total += d.getDiskUsage()
     
-    //TODO Implement disk usage for MongoDB
+    //Disk usage for MongoDB
+    def getFileSize(host:String) = {
+      val output = Seq("mongo", host, "--eval", "'printjson(db.stats())'").!!
+      val reg = """\"fileSize\"(\s):(\s)(\d+),""".r
+      val reg(a, b, size) = output
+      
+      size.toLong
+    }
+    val fileSizes = hosts map getFileSize
+    total += fileSizes reduce ( _ + _ )
     
     Ok(Json.obj("disk" -> (total)))
   }
