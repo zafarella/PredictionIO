@@ -36,7 +36,8 @@ lazy val root = project.in(file(".")).aggregate(
   toolsConncheck,
   toolsSettingsInit,
   toolsSoftwareManager,
-  toolsUsers)
+  toolsUsers,
+  toolsBulkUploader)
 
 // Commons and Output
 
@@ -242,5 +243,9 @@ lazy val toolsSoftwareManager = project.in(file("tools/softwaremanager"))
   .settings(scalariformSettings: _*)
 
 lazy val toolsUsers = project.in(file("tools/users"))
+  .dependsOn(commons)
+  .settings(scalariformSettings: _*)
+
+lazy val toolsBulkUploader = project.in(file("tools/bulkuploader"))
   .dependsOn(commons)
   .settings(scalariformSettings: _*)
