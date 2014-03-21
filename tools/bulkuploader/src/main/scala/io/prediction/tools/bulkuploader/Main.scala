@@ -84,6 +84,11 @@ object BulkUploader {
     users.insert(makeUser("name2"))
   }
 
+  /**
+   *  creation of u2i. creates for each user 3 u2i randomly. 
+   *  two are view, and one conversion. 
+   * 
+   * /
   def makeU2Iaction(appid: Int, numUsers: Int = 0, numItems: Int = 0) {
     val config = new Config()
     val u2i = config.getAppdataU2IActions()
@@ -102,7 +107,6 @@ object BulkUploader {
       val rnd = new scala.util.Random
       val range = 1 to numItems
       var i = range(rnd.nextInt(range length))
-      println("Value of a: " + a);
       u2i.insert(makeU2IAction("u" + a, "i" + i, "view"))
       i = range(rnd.nextInt(range length))
       u2i.insert(makeU2IAction("u" + a, "i" + i, "view"))
