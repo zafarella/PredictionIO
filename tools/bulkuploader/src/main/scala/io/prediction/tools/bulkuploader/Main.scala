@@ -14,7 +14,6 @@ import io.prediction.commons.appdata.Item
 import io.prediction.commons.appdata.User
 import io.prediction.commons.appdata.U2IAction
 import scala.util.Random
-import scala.language.postfixOps
 
 import com.github.nscala_time.time.Imports.DateTime
 
@@ -72,10 +71,6 @@ object BulkUploader {
       attributes = None);
     if (numUsers > 0) {
       for (a <- 1 to numUsers) {
-        //println( "Value of a: " + a );
-
-        //val r = range(rnd.nextInt(range length))
-        //println("Value of a: " + randomInt);
         users.insert(makeUser("u" + a))
       }
       return Some(0)
@@ -88,7 +83,7 @@ object BulkUploader {
    *  creation of u2i. creates for each user 3 u2i randomly. 
    *  two are view, and one conversion. 
    * 
-   * /
+   */
   def makeU2Iaction(appid: Int, numUsers: Int = 0, numItems: Int = 0) {
     val config = new Config()
     val u2i = config.getAppdataU2IActions()
@@ -105,13 +100,14 @@ object BulkUploader {
 
     for (a <- 1 to numUsers) {
       val rnd = new scala.util.Random
-      val range = 1 to numItems
-      var i = range(rnd.nextInt(range length))
-      u2i.insert(makeU2IAction("u" + a, "i" + i, "view"))
-      i = range(rnd.nextInt(range length))
-      u2i.insert(makeU2IAction("u" + a, "i" + i, "view"))
-      i = range(rnd.nextInt(range length))
-      u2i.insert(makeU2IAction("u" + a, "i" + i, "conversion"))
+      
+      var rndNumber = rnd.nextInt(numUsers)
+      u2i.insert(makeU2IAction("u" + a, "i" + rndNumber, "view"))
+      
+      rndNumber = rnd.nextInt(numUsers)
+      u2i.insert(makeU2IAction("u" + a, "i" + rndNumber, "view"))
+      rndNumber = rnd.nextInt(numUsers)
+      u2i.insert(makeU2IAction("u" + a, "i" + rndNumber, "conversion"))
     }
 
   }
