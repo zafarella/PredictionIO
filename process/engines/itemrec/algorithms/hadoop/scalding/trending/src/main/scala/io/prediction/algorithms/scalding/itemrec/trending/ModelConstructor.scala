@@ -7,7 +7,6 @@ import io.prediction.commons.scalding.modeldata.ItemRecScores
 
 /**
  * Source:
- *   selectedItems.tsv
  *   itemRecScores.tsv
  * Sink:
  *   itemRecScores DB
@@ -35,10 +34,10 @@ import io.prediction.commons.scalding.modeldata.ItemRecScores
  *
  * Example:
  * batch:
- * scald.rb --hdfs-local io.prediction.algorithms.scalding.itemrec.knnitembased.ModelConstructor --dbType mongodb --dbName modeldata --dbHost 127.0.0.1 --dbPort 27017 --hdfsRoot hdfs/predictionio/ --appid 34 --engineid 3 --algoid 9 --modelSet false
+ * scald.rb --hdfs-local io.prediction.algorithms.scalding.itemrec.trending.ModelConstructor --dbType mongodb --dbName modeldata --dbHost 127.0.0.1 --dbPort 27017 --hdfsRoot hdfs/predictionio/ --appid 34 --engineid 3 --algoid 9 --modelSet false
  *
  * offline eval
- * scald.rb --hdfs-local io.prediction.algorithms.scalding.itemrec.knnitembased.ModelConstructor --dbType file --dbName modeldata_path/ --hdfsRoot hdfs/predictionio/ --appid 34 --engineid 3 --algoid 9 --modelSet false --evalid 15
+ * scald.rb --hdfs-local io.prediction.algorithms.scalding.itemrec.trending.ModelConstructor --dbType file --dbName modeldata_path/ --hdfsRoot hdfs/predictionio/ --appid 34 --engineid 3 --algoid 9 --modelSet false --evalid 15
  */
 class ModelConstructor(args: Args) extends Job(args) {
 
