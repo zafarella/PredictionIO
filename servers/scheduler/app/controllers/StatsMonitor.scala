@@ -46,10 +46,7 @@ trait StatsMonitor {
     return mongo ++ java
   }
 
-  /**
-   * Get RAM usage in percent
-   */
-  def getRamUsage = Action {
+  private def getRam: Double = {
     var total = 0.0
 
     for (pid <- pids) {
@@ -57,13 +54,10 @@ trait StatsMonitor {
       total += mem.getSize;
     }
 
-    Ok(Json.obj("ram" -> (total)))
+    return total
   }
 
-  /**
-   * Get CPU usage in percent
-   */
-  def getCpuUsage = Action {
+  private def getCpu: Double = {
     var total = 0.0
 
     for (pid <- pids) {
@@ -71,13 +65,10 @@ trait StatsMonitor {
       total += cpu.getPercent()
     }
 
-    Ok(Json.obj("cpu" -> (total)))
+    return total
   }
 
-  /**
-   * Get total Disk Space used
-   */
-  def getUsedDiskSpace() = Action {
+  private def getDisk: Double = {
     var total = 0.0
 
     //HDFS Disk Usage
@@ -97,7 +88,42 @@ trait StatsMonitor {
     val fileSizes = hostCmds map getFileSize
     total += fileSizes reduce (_ + _)
 
+    return total
+  }
+
+  /**
+   * Get RAM usage in percent
+   */
+  def getRamUsage = Action {
+    val total = getRam
+
+    Ok(Json.obj("ram" -> (total)))
+  }
+
+  /**
+   * Get CPU usage in percent
+   */
+  def getCpuUsage = Action {
+    val total = getCpu
+
+    Ok(Json.obj("cpu" -> (total)))
+  }
+
+  /**
+   * Get total Disk Space used
+   */
+  def getUsedDiskSpace() = Action {
+    val total = getDisk
+
     Ok(Json.obj("disk" -> (total)))
+  }
+
+  def getStats() = Action {
+    val ram = getRam
+    val cpu = getCpu
+    val disk = getDisk
+
+    Ok(Json.obj("ram" -> ram, "cpu" -> cpu, "disk" -> disk))
   }
 
 }
