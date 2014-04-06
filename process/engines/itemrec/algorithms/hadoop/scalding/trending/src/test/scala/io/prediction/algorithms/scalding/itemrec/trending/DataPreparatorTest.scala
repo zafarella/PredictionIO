@@ -1,4 +1,4 @@
-package io.prediction.algorithms.scalding.itemrec.knnitembased
+package io.prediction.algorithms.scalding.itemrec.trending
 
 import org.specs2.mutable._
 
@@ -26,11 +26,9 @@ class DataPreparatorTest extends Specification with TupleConversions {
     val dbPort = None //Option(27017)
     val hdfsRoot = "testroot/"
 
-    JobTest("io.prediction.algorithms.scalding.itemrec.knnitembased.DataPreparator")
+    JobTest("io.prediction.algorithms.scalding.itemrec.trending.DataPreparator")
       .arg("dbType", dbType)
       .arg("dbName", dbName)
-      //.arg("dbHost", dbHost.get)
-      //.arg("dbPort", dbPort.get.toString)
       .arg("hdfsRoot", hdfsRoot)
       .arg("appid", "2")
       .arg("engineid", "4")
@@ -70,7 +68,7 @@ class DataPreparatorTest extends Specification with TupleConversions {
     val dbPort = None //Option(27017)
     val hdfsRoot = "testroot/"
 
-    JobTest("io.prediction.algorithms.scalding.itemrec.knnitembased.DataPreparator")
+    JobTest("io.prediction.algorithms.scalding.itemrec.trending.DataPreparator")
       .arg("dbType", dbType)
       .arg("dbName", dbName)
       //.arg("dbHost", dbHost.get)
@@ -127,11 +125,11 @@ class DataPreparatorTest extends Specification with TupleConversions {
   val test1Params: Map[String, String] = Map("viewParam" -> "3", "likeParam" -> "4", "dislikeParam" -> "1", "conversionParam" -> "5",
     "conflictParam" -> "latest")
 
-  "itemrec.knnitembased DataPreparator with only rate actions, all itypes, no conflict" should {
+  "itemrec.trending DataPreparator with only rate actions, all itypes, no conflict" should {
     test(test1AllItypes, test1Params, test1Items, test1U2i, test1Ratings, test1Items)
   }
 
-  "itemrec.knnitembased DataPreparator with only rate actions, no itypes specified, no conflict" should {
+  "itemrec.trending DataPreparator with only rate actions, no itypes specified, no conflict" should {
     testWithoutItypes(test1Params, test1Items, test1U2i, test1Ratings, test1Items)
   }
 
@@ -143,7 +141,7 @@ class DataPreparatorTest extends Specification with TupleConversions {
   val test2U2i = List(
     (Rate, "u0", "i0", "123448", "3"),
     (Rate, "u0", "i0", "123449", "4"), // highest
-    (Rate, "u0", "i0", "123451", "2"), // latest 
+    (Rate, "u0", "i0", "123451", "2"), // latest
     (Rate, "u0", "i0", "123450", "1"), // lowest
 
     (Rate, "u0", "i1", "123456", "1"), // lowest
@@ -198,19 +196,19 @@ class DataPreparatorTest extends Specification with TupleConversions {
   val test2ParamsHighest = test2Params + ("conflictParam" -> "highest")
   val test2ParamsLowest = test2Params + ("conflictParam" -> "lowest")
 
-  "itemrec.knnitembased DataPreparator with only rate actions, all itypes, conflict=latest" should {
+  "itemrec.trending DataPreparator with only rate actions, all itypes, conflict=latest" should {
     test(test2AllItypes, test2Params, test2Items, test2U2i, test2RatingsLatest, test2Items)
   }
 
-  "itemrec.knnitembased DataPreparator with only rate actions, all itypes, conflict=highest" should {
+  "itemrec.trending DataPreparator with only rate actions, all itypes, conflict=highest" should {
     test(test2AllItypes, test2ParamsHighest, test2Items, test2U2i, test2RatingsHighest, test2Items)
   }
 
-  "itemrec.knnitembased DataPreparator with only rate actions, all itypes, conflict=lowest" should {
+  "itemrec.trending DataPreparator with only rate actions, all itypes, conflict=lowest" should {
     test(test2AllItypes, test2ParamsLowest, test2Items, test2U2i, test2RatingsLowest, test2Items)
   }
 
-  "itemrec.knnitembased DataPreparator with only rate actions, some itypes, conflict=highest" should {
+  "itemrec.trending DataPreparator with only rate actions, some itypes, conflict=highest" should {
     test(test2Itypes_t1t4, test2ParamsHighest, test2Items, test2U2i, test2RatingsHighest_t1t4, test2Items_t1t4)
   }
 
@@ -238,7 +236,7 @@ class DataPreparatorTest extends Specification with TupleConversions {
   val test3Params: Map[String, String] = Map("viewParam" -> "1", "likeParam" -> "4", "dislikeParam" -> "2", "conversionParam" -> "5",
     "conflictParam" -> "latest")
 
-  "itemrec.knnitembased DataPreparator with only all actions, all itypes, no conflict" should {
+  "itemrec.trending DataPreparator with only all actions, all itypes, no conflict" should {
     test(test3AllItypes, test3Params, test3Items, test3U2i, test3Ratings, test3Items)
   }
 
@@ -279,7 +277,7 @@ class DataPreparatorTest extends Specification with TupleConversions {
     ("u1", "i0", 2),
     ("u1", "i1", 1))
 
-  "itemrec.knnitembased DataPreparator with all actions, all itypes, and conflicts=latest" should {
+  "itemrec.trending DataPreparator with all actions, all itypes, and conflicts=latest" should {
     test(test4AllItypes, test4Params, test4Items, test4U2i, test4RatingsLatest, test4Items)
   }
 
@@ -292,7 +290,7 @@ class DataPreparatorTest extends Specification with TupleConversions {
     ("u0", "i3", 2),
     ("u1", "i1", 1))
 
-  "itemrec.knnitembased DataPreparator with all actions, all itypes, ignore View actions and conflicts=latest" should {
+  "itemrec.trending DataPreparator with all actions, all itypes, ignore View actions and conflicts=latest" should {
     test(test4AllItypes, test4ParamsIgnoreView, test4Items, test4U2i, test4RatingsIgnoreViewLatest, test4Items)
   }
 
@@ -307,7 +305,7 @@ class DataPreparatorTest extends Specification with TupleConversions {
     ("u1", "i0", 1),
     ("u1", "i1", 5))
 
-  "itemrec.knnitembased DataPreparator with all actions, all itypes, ignore all actions except View (and Rate) and conflicts=latest" should {
+  "itemrec.trending DataPreparator with all actions, all itypes, ignore all actions except View (and Rate) and conflicts=latest" should {
     test(test4AllItypes, test4ParamsIgnoreAllExceptView, test4Items, test4U2i, test4RatingsIgnoreAllExceptViewLatest, test4Items)
   }
 
@@ -321,7 +319,7 @@ class DataPreparatorTest extends Specification with TupleConversions {
     ("u0", "i3", 2),
     ("u1", "i1", 5))
 
-  "itemrec.knnitembased DataPreparator with all actions, all itypes, ignore all actions (except Rate) and conflicts=latest" should {
+  "itemrec.trending DataPreparator with all actions, all itypes, ignore all actions (except Rate) and conflicts=latest" should {
     test(test4AllItypes, test4ParamsIgnoreAll, test4Items, test4U2i, test4RatingsIgnoreAllLatest, test4Items)
   }
 
@@ -336,7 +334,7 @@ class DataPreparatorTest extends Specification with TupleConversions {
     ("u1", "i0", 2),
     ("u1", "i1", 1))
 
-  "itemrec.knnitembased DataPreparator with all actions, some itypes, and conflicts=lowest" should {
+  "itemrec.trending DataPreparator with all actions, some itypes, and conflicts=lowest" should {
     test(test4Itypes_t3, test4ParamsLowest, test4Items, test4U2i, test4RatingsLowest_t3, test4Items_t3)
   }
 

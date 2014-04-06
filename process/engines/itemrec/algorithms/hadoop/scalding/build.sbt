@@ -8,7 +8,10 @@ parallelExecution in Test := false
 
 libraryDependencies ++= Seq(
   "org.apache.hadoop" % "hadoop-core" % "1.0.4",
-  "com.twitter" %% "scalding-core" % "0.8.6")
+  "com.twitter" %% "scalding-core" % "0.8.6",
+  "org.scalanlp" % "breeze_2.10" % "0.7",
+  "org.scalanlp" % "breeze-natives_2.10" % "0.7"
+  )
 
 resolvers ++= Seq("Concurrent Maven Repo" at "http://conjars.org/repo")
 

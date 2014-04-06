@@ -57,7 +57,7 @@ class ISMAPAtKDataPreparatorTest extends Specification with TupleConversions {
       .arg("algoid", "8")
       .arg("goalParam", params("goalParam"))
       .arg("kParam", params("kParam"))
-      .source(U2iActions(appId=5, dbType=test_dbType, dbName=test_dbName, dbHost=test_dbHost, dbPort=test_dbPort).getSource, testU2i)
+      .source(U2iActions(appId = 5, dbType = test_dbType, dbName = test_dbName, dbHost = test_dbHost, dbPort = test_dbPort).getSource, testU2i)
       .sink[(String, String)](Tsv(OfflineMetricFile(hdfsRoot, 2, 4, 5, 6, 8, "relevantItems.tsv"))) { outputBuffer =>
         "correctly generates relevantItems for each user" in {
           val output = splitAndSortList(outputBuffer.toList)
@@ -79,24 +79,24 @@ class ISMAPAtKDataPreparatorTest extends Specification with TupleConversions {
   val testU2i = List(
     // u0
     (Rate, "u0", "i0", "123450", "4"),
-    (View, "u0", "i1", "123457", "1"),
-    (Dislike, "u0", "i2", "123458", "0"),
-    (View, "u0", "i3", "123459", "0"),
-    (View, "u0", "i7", "123460", "0"),
+    (View, "u0", "i1", "123457", "PIO_NONE"),
+    (Dislike, "u0", "i2", "123458", "PIO_NONE"),
+    (View, "u0", "i3", "123459", "PIO_NONE"),
+    (View, "u0", "i7", "123460", "PIO_NONE"),
 
     // u1
-    (View, "u1", "i0", "123457", "2"),
-    (Conversion, "u1", "i1", "123458", "0"),
-    (Conversion, "u1", "i4", "123457", "0"),
-    (Conversion, "u1", "i5", "123456", "0"),
+    (View, "u1", "i0", "123457", "PIO_NONE"),
+    (Conversion, "u1", "i1", "123458", "PIO_NONE"),
+    (Conversion, "u1", "i4", "123457", "PIO_NONE"),
+    (Conversion, "u1", "i5", "123456", "PIO_NONE"),
     (Rate, "u1", "i7", "123456", "3"),
     (Rate, "u1", "i8", "123454", "3"),
     (Rate, "u1", "i9", "123453", "4"),
 
     // u2
-    (View, "u2", "i3", "123458", "0"),
-    (Conversion, "u2", "i4", "123451", "0"),
-    (Conversion, "u2", "i5", "123452", "0"))
+    (View, "u2", "i3", "123458", "PIO_NONE"),
+    (Conversion, "u2", "i4", "123451", "PIO_NONE"),
+    (Conversion, "u2", "i5", "123452", "PIO_NONE"))
 
   "itemsim.ismap ISMAPAtKDataPreparator with goal = view" should {
     val params = Map("goalParam" -> "view", "kParam" -> "4")

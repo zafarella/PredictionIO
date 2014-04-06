@@ -64,7 +64,7 @@ class DataPreparator(args: Args) extends Job(args) {
 
   val startTimeArg = args.getOrElse("startTime", defaultStart.toString).toLong
   val windowSizeArg = args.getOrElse("windowSize", defaultWindowSize.toString).toInt
-  val numWindowsArg = args.getOrElse("numWindows", defaultNumWindows.toString).toInt
+  val numWindowsArg = args.getOrElse("numWindows", defaultNumWindows.toString)
   val actionArg = args.getOrElse("action", defaultAction.toString)
 
   // the number of seconds in each of the following
@@ -73,9 +73,9 @@ class DataPreparator(args: Args) extends Job(args) {
     case "day" => 86400
     case "week" => 604800
     case "year" => 31536000
-    case _ => -1 
+    case _ => -1
   }
-  val endTime = startTimeArg - windowSize*numWindowsArg
+  val endTime = startTimeArg - windowSize * numWindowsArg
 
   /**
    * source
@@ -103,14 +103,14 @@ class DataPreparator(args: Args) extends Job(args) {
     .filter('action, 't) { fields: (String, String) =>
       val (action, t) = fields
       action == actionArg && t.toLong >= endTime && t.toLong <= startTimeArg
-    }.groupBy('iid) { 
+    }.groupBy('iid) {
       _.foldLeft('t -> 'timeseries)(Array.fill[Int](numWindowsArg)(0)) {
         (seriesSoFar: Array[Int], time: String) =>
-          seriesSoFar(((time.toLong-endTime)/windowSize).toInt) += 1
+          seriesSoFar(((time.toLong - endTime) / windowSize).toInt) += 1
           seriesSoFar
       }
-    }.map('timeseries ->'timeseriesstring) {
-      timeseries:Array[Int] =>
+    }.map('timeseries -> 'timeseriesstring) {
+      timeseries: Array[Int] =>
         timeseries.mkString(",")
     }.project('iid, 'timeseriesstring)
     .write(sink)
