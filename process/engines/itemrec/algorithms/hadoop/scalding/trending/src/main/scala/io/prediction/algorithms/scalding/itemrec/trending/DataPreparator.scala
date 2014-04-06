@@ -26,8 +26,8 @@ import io.prediction.commons.filepath._
  * Optional args:
  * --dbHost: <string> (eg. "127.0.0.1")
  * --dbPort: <int> (eg. 27017)
- * --startTime: <long>
- * --windowSize: <int>
+ * --endTime: <long>
+ * --windowSize: <long>
  * --numWindows: <int>
  * --action: <string>
  *
@@ -62,20 +62,20 @@ class DataPreparator(args: Args) extends Job(args) {
   val defaultNumWindows = 20
   val defaultAction = "view"
 
-  val startTimeArg = args.getOrElse("startTime", defaultStart.toString).toLong
-  val windowSizeArg = args.getOrElse("windowSize", defaultWindowSize.toString).toInt
-  val numWindowsArg = args.getOrElse("numWindows", defaultNumWindows.toString)
+  val endTimeArg = args.getOrElse("endTime", defaultStart.toString).toLong
+  val windowSizeArg = args.getOrElse("windowSize", defaultWindowSize).toLong
+  val numWindowsArg = args.getOrElse("numWindows", defaultNumWindows.toString).toInt
   val actionArg = args.getOrElse("action", defaultAction.toString)
 
   // the number of seconds in each of the following
-  val windowSize = windowSizeArg match {
-    case "hour" => 3600
-    case "day" => 86400
-    case "week" => 604800
-    case "year" => 31536000
-    case _ => -1
-  }
-  val endTime = startTimeArg - windowSize * numWindowsArg
+  // val windowSize = windowSizeArg match {
+  //   case "hour" => 3600
+  //   case "day" => 86400
+  //   case "week" => 604800
+  //   case "year" => 31536000
+  //   case _ => -1
+  // }
+  val startTime = endTimeArg - windowSizeArg * numWindowsArg
 
   /**
    * source
@@ -102,7 +102,7 @@ class DataPreparator(args: Args) extends Job(args) {
   u2i.joinWithSmaller('iid -> 'iidx, items)
     .filter('action, 't) { fields: (String, String) =>
       val (action, t) = fields
-      action == actionArg && t.toLong >= endTime && t.toLong <= startTimeArg
+      action == actionArg && t.toLong >= startTime && t.toLong < endTimeArg
     }.groupBy('iid) {
       _.foldLeft('t -> 'timeseries)(Array.fill[Int](numWindowsArg)(0)) {
         (seriesSoFar: Array[Int], time: String) =>

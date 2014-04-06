@@ -11,4 +11,5 @@ dist/target/
 vendors
 .DS_Store
 .idea
+.settings
 .gradle
