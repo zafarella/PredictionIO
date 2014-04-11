@@ -1,4 +1,4 @@
-package io.prediction.algorithms.scalding.itemtrend.generic
+package io.prediction.algorithms.scalding.itemrec.trending
 
 import com.twitter.scalding._
 
@@ -58,12 +58,12 @@ class DataPreparator(args: Args) extends Job(args) {
 
   // Default argument values
   val defaultStart = System.currentTimeMillis / 1000
-  val defaultWindowSize = "hour"
+  val defaultWindowSize = 1
   val defaultNumWindows = 20
   val defaultAction = "view"
 
   val endTimeArg = args.getOrElse("endTime", defaultStart.toString).toLong
-  val windowSizeArg = args.getOrElse("windowSize", defaultWindowSize).toLong
+  val windowSizeArg = args.getOrElse("windowSize", defaultWindowSize.toString).toLong
   val numWindowsArg = args.getOrElse("numWindows", defaultNumWindows.toString).toInt
   val actionArg = args.getOrElse("action", defaultAction.toString)
 
@@ -94,7 +94,7 @@ class DataPreparator(args: Args) extends Job(args) {
   /**
    * sink
    */
-  val sink = Tsv(DataFile(hdfsRootArg, appidArg, engineidArg, algoidArg, evalidArg, "ratings.tsv"))
+  val timeseriesSink = Tsv(DataFile(hdfsRootArg, appidArg, engineidArg, algoidArg, evalidArg, "ratings.tsv"))
 
   /**
    * computation
@@ -102,17 +102,23 @@ class DataPreparator(args: Args) extends Job(args) {
   u2i.joinWithSmaller('iid -> 'iidx, items)
     .filter('action, 't) { fields: (String, String) =>
       val (action, t) = fields
+      println(action, t)
       action == actionArg && t.toLong >= startTime && t.toLong < endTimeArg
-    }.groupBy('iid) {
+    }
+    .groupBy('iid) {
       _.foldLeft('t -> 'timeseries)(Array.fill[Int](numWindowsArg)(0)) {
-        (seriesSoFar: Array[Int], time: String) =>
-          seriesSoFar(((time.toLong - endTime) / windowSize).toInt) += 1
+        (seriesSoFar: Array[Int], t: String) =>
+          // seriesSoFar(((t.toLong - startTime) / windowSizeArg).toInt) += 1
+          seriesSoFar(((0) / windowSizeArg).toInt) += 1
           seriesSoFar
       }
-    }.map('timeseries -> 'timeseriesstring) {
+    }
+    .map('timeseries -> 'timeseriesstring) {
       timeseries: Array[Int] =>
         timeseries.mkString(",")
-    }.project('iid, 'timeseriesstring)
-    .write(sink)
+    }
+    .project('iid, 'timeseriesstring)
+    .write(timeseriesSink)
+  println("done")
 
 }

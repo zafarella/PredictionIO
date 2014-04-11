@@ -8,12 +8,9 @@ parallelExecution in Test := false
 
 libraryDependencies ++= Seq(
   "org.apache.hadoop" % "hadoop-core" % "1.0.4",
-  "com.twitter" %% "scalding-core" % "0.8.6",
-  "org.scalanlp" %% "breeze" % "0.6.1")
+  "com.twitter" %% "scalding-core" % "0.8.6")
 
-resolvers ++= Seq("Concurrent Maven Repo" at "http://conjars.org/repo",
-  "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/",
-  "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/")
+resolvers ++= Seq("Concurrent Maven Repo" at "http://conjars.org/repo")
 
 assemblySettings
 
