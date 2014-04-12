@@ -181,12 +181,19 @@ lazy val processEnginesItemSimAlgoHadoopScalding = project
     processEnginesItemSimAlgoHadoopScaldingItemSimCF,
     processEnginesItemSimAlgoHadoopScaldingLatestRank,
     processEnginesItemSimAlgoHadoopScaldingMahout,
-    processEnginesItemSimAlgoHadoopScaldingRandomRank)
+    processEnginesItemSimAlgoHadoopScaldingRandomRank,
+    processEnginesItemRecAlgoHadoopScaldingKnnTrend)
   .dependsOn(
     processEnginesItemSimAlgoHadoopScaldingItemSimCF,
     processEnginesItemSimAlgoHadoopScaldingLatestRank,
     processEnginesItemSimAlgoHadoopScaldingMahout,
-    processEnginesItemSimAlgoHadoopScaldingRandomRank)
+    processEnginesItemSimAlgoHadoopScaldingRandomRank,
+    processEnginesItemRecAlgoHadoopScaldingKnnTrend)
+
+lazy val processEnginesItemRecAlgoHadoopScaldingKnnTrend = project
+  .in(file("process/engines/itemrec/algorithms/hadoop/scalding/knntrend"))
+  .dependsOn(processCommonsHadoopScalding)
+  .settings(scalariformSettings: _*)
 
 lazy val processEnginesItemSimAlgoHadoopScaldingItemSimCF = project
   .in(file("process/engines/itemsim/algorithms/hadoop/scalding/itemsimcf"))
