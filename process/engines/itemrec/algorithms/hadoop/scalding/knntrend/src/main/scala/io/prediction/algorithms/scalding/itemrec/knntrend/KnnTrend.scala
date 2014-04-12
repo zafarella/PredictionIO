@@ -32,7 +32,6 @@ class KnnTrend(args: Args) extends Job(args) {
   val input_path = args("input");
   val output_path = args("output");
 
-
   ///////////////////////////////////////////////////////
   //               Read Input
   ///////////////////////////////////////////////////////
@@ -52,15 +51,15 @@ class KnnTrend(args: Args) extends Job(args) {
 
   val trending_samples = TextLine(trending_samples_path)
     .mapTo('samples) {
-    line: String =>
-      DoubleListParser(line).get
-  }
+      line: String =>
+        DoubleListParser(line).get
+    }
 
   val not_trending_samples = TextLine(not_trending_samples_path)
     .mapTo('samples) {
-    line: String =>
-      DoubleListParser(line).get
-  }
+      line: String =>
+        DoubleListParser(line).get
+    }
 
   ///////////////////////////////////////////////////////
   //          Get trending items
@@ -74,7 +73,7 @@ class KnnTrend(args: Args) extends Job(args) {
 
       (id, Distance(samples, observations))
   }.groupBy('id) {
-    _.sum[Double]('trending_vote -> 'trending_votes)
+    _.sum('trending_vote -> 'trending_votes)
 
   }
 
@@ -85,7 +84,7 @@ class KnnTrend(args: Args) extends Job(args) {
       val observations = x._3
       (id, Distance(samples, observations))
   }.groupBy('id) {
-    _.sum[Double]('not_trending_vote -> 'not_trending_votes)
+    _.sum('not_trending_vote -> 'not_trending_votes)
   }
 
   //Compute trending factor and get the top n trending items
@@ -105,9 +104,9 @@ class KnnTrend(args: Args) extends Job(args) {
   ///////////////////////////////////////////////////////
 
   val output = Csv(p = output_path, separator = "\t")
-  results/*.joinWithLarger('id -> 'id, time_series)
+  results /*.joinWithLarger('id -> 'id, time_series)
     .groupAll { _.sortBy('trending_factor) }
-    */.write(output)
+    */ .write(output)
 
   ///////////////////////////////////////////////////////
   //--------- Distance between two series
@@ -123,14 +122,14 @@ class KnnTrend(args: Args) extends Job(args) {
 
       min_dist = math.min(dist, min_dist)
     }
-    return math.exp(-y *min_dist)
+    return math.exp(-y * min_dist)
   }
 
   def SumEuclideanDistance(s: List[Double], o: List[Double]): Double = {
     //Sum all the distances
     var summ = 0.0
     for ((as, ao) <- (s zip o)) {
-      summ +=  EuclideanDistance(as, ao)
+      summ += EuclideanDistance(as, ao)
     }
     return summ
   }

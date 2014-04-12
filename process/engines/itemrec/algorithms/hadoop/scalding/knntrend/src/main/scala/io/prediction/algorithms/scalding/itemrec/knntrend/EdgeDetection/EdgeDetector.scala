@@ -11,7 +11,6 @@ import scala.collection.mutable.MutableList
  */
 class EdgeDetector(window_h: Integer, window_w: Integer, threshold: Double, values: List[Double]) {
 
-
   /**
    * Detect edge in time series. Return edge evaluation
    * @param t Time t where edge detection will start
@@ -21,7 +20,7 @@ class EdgeDetector(window_h: Integer, window_w: Integer, threshold: Double, valu
     //Solve the linear equation
     var results: MutableList[Double] = MutableList[Double]()
     for (i <- 0 to length) {
-      results +=  getEdgeFactor(i + t)
+      results += getEdgeFactor(i + t)
     }
     return results.toList
   }
