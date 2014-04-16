@@ -20,14 +20,17 @@ class DataPreparatorTest extends Specification with TupleConversions {
   val engineid = 4
   val algoid = 5
 
-  def test(itypes: List[String], params: Map[String, String],
-    items: List[(String, String)], u2iActions: List[(String, String, String, String, String)],
-    timeseries: List[(String, String)], selectedItems: List[(String, String)]) = {
+  def test(itypes: List[String],
+    params: Map[String, String],
+    items: List[(String, String)],
+    u2iActions: List[(String, String, String, String, String)],
+    timeseries: List[(String, String)],
+    selectedItems: List[(String, String)]) = {
 
     val dbType = "file"
     val dbName = "testpath/"
-    val dbHost = None //Option("testhost")
-    val dbPort = None //Option(27017)
+    val dbHost = None
+    val dbPort = None
     val hdfsRoot = "testroot/"
 
     JobTest("io.prediction.algorithms.scalding.itemrec.trending.DataPreparator")
@@ -45,42 +48,42 @@ class DataPreparatorTest extends Specification with TupleConversions {
       //.arg("debug", List("test")) // NOTE: test mode
       .source(Items(appId = appid, itypes = Some(itypes), dbType = dbType, dbName = dbName, dbHost = dbHost, dbPort = dbPort).getSource, items)
       .source(U2iActions(appId = appid, dbType = dbType, dbName = dbName, dbHost = dbHost, dbPort = dbPort).getSource, u2iActions)
-      .sink[(String, String, Int)](Tsv(DataFile(hdfsRoot, appid, engineid, algoid, None, "ratings.tsv"))) { outputBuffer =>
+      .sink[(String, String)](Tsv(DataFile(hdfsRoot, appid, engineid, algoid, None, "ratings.tsv"))) { outputBuffer =>
+        // println(outputBuffer.toList)
         "correctly process and write data to ratings.tsv" in {
           outputBuffer.toList must containTheSameElementsAs(timeseries)
         }
       }
-      .sink[(String, String)](Tsv(DataFile(hdfsRoot, appid, engineid, algoid, None, "selectedItems.tsv"))) { outputBuffer =>
+      .sink[(String, String, String, String, String, String, String)](Tsv(DataFile(hdfsRoot, appid, engineid, algoid, None, "selectedItems.tsv"))) { outputBuffer =>
+        // println(outputBuffer.toList)
         "correctly write selectedItems.tsv" in {
           outputBuffer.toList must containTheSameElementsAs(selectedItems)
         }
       }
       .run
       .finish
-
   }
 
   /** no itypes specified */
   def testWithoutItypes(params: Map[String, String],
-    items: List[(String, String)], u2iActions: List[(String, String, String, String, String)],
-    timeseries: List[(String, String)], selectedItems: List[(String, String)]) = {
+    items: List[(String, String)],
+    u2iActions: List[(String, String, String, String, String)],
+    timeseries: List[(String, String)],
+    selectedItems: List[(String, String)]) = {
 
     val dbType = "file"
     val dbName = "testpath/"
-    val dbHost = None //Option("testhost")
-    val dbPort = None //Option(27017)
+    val dbHost = None
+    val dbPort = None
     val hdfsRoot = "testroot/"
 
     JobTest("io.prediction.algorithms.scalding.itemrec.trending.DataPreparator")
       .arg("dbType", dbType)
       .arg("dbName", dbName)
-      //.arg("dbHost", dbHost.get)
-      //.arg("dbPort", dbPort.get.toString)
       .arg("hdfsRoot", hdfsRoot)
       .arg("appid", appid.toString)
       .arg("engineid", engineid.toString)
       .arg("algoid", algoid.toString)
-      //.arg("itypes", itypes) // NOTE: no itypes args!
       .arg("action", params("action"))
       .arg("endTime", params("endTime"))
       .arg("windowSize", params("windowSize"))
@@ -88,29 +91,35 @@ class DataPreparatorTest extends Specification with TupleConversions {
       //.arg("debug", List("test")) // NOTE: test mode
       .source(Items(appId = appid, itypes = None, dbType = dbType, dbName = dbName, dbHost = dbHost, dbPort = dbPort).getSource, items)
       .source(U2iActions(appId = appid, dbType = dbType, dbName = dbName, dbHost = dbHost, dbPort = dbPort).getSource, u2iActions)
-      .sink[(String, String, Int)](Tsv(DataFile(hdfsRoot, appid, engineid, algoid, None, "ratings.tsv"))) { outputBuffer =>
+      .sink[(String, String)](Tsv(DataFile(hdfsRoot, appid, engineid, algoid, None, "ratings.tsv"))) { outputBuffer =>
+        // println(outputBuffer.toList)
         "correctly process and write data to ratings.tsv" in {
           outputBuffer.toList must containTheSameElementsAs(timeseries)
         }
       }
-      .sink[(String, String)](Tsv(DataFile(hdfsRoot, appid, engineid, algoid, None, "selectedItems.tsv"))) { outputBuffer =>
+      .sink[(String, String, String, String, String, String, String)](Tsv(DataFile(hdfsRoot, appid, engineid, algoid, None, "selectedItems.tsv"))) { outputBuffer =>
+        // println(outputBuffer.toList)
         "correctly write selectedItems.tsv" in {
           outputBuffer.toList must containTheSameElementsAs(selectedItems)
         }
       }
       .run
       .finish
-
   }
+
+  val noEndtime = "PIO_NONE"
 
   /**
    * Test 1. basic. view actions only
    */
   val test1AllItypes = List("t1", "t2", "t3", "t4")
-  val test1Items = List(("i0", "t1,t2,t3"),
+
+  val test1Items = List(
+    ("i0", "t1,t2,t3"),
     ("i1", "t2,t3"),
     ("i2", "t4"),
     ("i3", "t3,t4"))
+
   val test1U2i = List(
     (view, "u0", "i0", "0", "3"),
     (view, "u0", "i1", "1", "1"),

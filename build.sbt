@@ -115,15 +115,15 @@ lazy val processEnginesItemRecAlgoHadoopScalding = project
     processEnginesItemRecAlgoHadoopScaldingKnnitembased,
     processEnginesItemRecAlgoHadoopScaldingRandomrank,
     processEnginesItemRecAlgoHadoopScaldingLatestrank,
-    processEnginesItemRecAlgoHadoopScaldingMahout,processEnginesItemRecAlgoHadoopScaldingTrending,
-    processEnginesItemRecAlgoHadoopScaldingTestBreeze)
+    processEnginesItemRecAlgoHadoopScaldingMahout,
+    processEnginesItemRecAlgoHadoopScaldingTrending)
   .dependsOn(
     processEnginesItemRecAlgoHadoopScaldingGeneric,
     processEnginesItemRecAlgoHadoopScaldingKnnitembased,
     processEnginesItemRecAlgoHadoopScaldingRandomrank,
     processEnginesItemRecAlgoHadoopScaldingLatestrank,
-    processEnginesItemRecAlgoHadoopScaldingMahout,processEnginesItemRecAlgoHadoopScaldingTrending,
-    processEnginesItemRecAlgoHadoopScaldingTestBreeze)
+    processEnginesItemRecAlgoHadoopScaldingMahout,
+    processEnginesItemRecAlgoHadoopScaldingTrending)
 
 lazy val processEnginesItemRecAlgoHadoopScaldingGeneric = project
   .in(file("process/engines/itemrec/algorithms/hadoop/scalding/generic"))
@@ -144,11 +144,6 @@ lazy val processEnginesItemRecAlgoHadoopScaldingTrending = project
  .in(file("process/engines/itemrec/algorithms/hadoop/scalding/trending"))
  .dependsOn(processCommonsHadoopScalding)
  .settings(scalariformSettings: _*)
-
-lazy val processEnginesItemRecAlgoHadoopScaldingTestBreeze = project
-  .in(file("process/engines/itemrec/algorithms/hadoop/scalding/testbreeze"))
-  .dependsOn(processCommonsHadoopScalding)
-  .settings(scalariformSettings: _*)
 
 lazy val processEnginesItemRecAlgoHadoopScaldingLatestrank = project
   .in(file("process/engines/itemrec/algorithms/hadoop/scalding/latestrank"))

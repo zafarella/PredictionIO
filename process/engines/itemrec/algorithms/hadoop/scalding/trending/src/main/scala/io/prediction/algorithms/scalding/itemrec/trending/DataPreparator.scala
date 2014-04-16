@@ -7,7 +7,7 @@ import io.prediction.commons.filepath._
 
 /**
  * Source: appdata DB (items, u2iActions)
- * Sink: ratings.tsv
+ * Sink: ratings.tsv, selectedItems.tsv
  * Descripton:
  *   Prepare data for itemrec.trending algo. Read from appdata DB and store selected items
  *   and ratings into a file.
@@ -76,6 +76,7 @@ class DataPreparator(args: Args) extends Job(args) {
   //   case _ => -1
   // }
   val startTime = endTimeArg - windowSizeArg * numWindowsArg
+  println(startTime, endTimeArg)
 
   /**
    * source
@@ -95,30 +96,39 @@ class DataPreparator(args: Args) extends Job(args) {
    * sink
    */
   val timeseriesSink = Tsv(DataFile(hdfsRootArg, appidArg, engineidArg, algoidArg, evalidArg, "ratings.tsv"))
+  val selectedItemsSink = Tsv(DataFile(hdfsRootArg, appidArg, engineidArg, algoidArg, evalidArg, "selectedItems.tsv"))
 
   /**
    * computation
    */
-  u2i.joinWithSmaller('iid -> 'iidx, items)
-    .filter('action, 't) { fields: (String, String) =>
-      val (action, t) = fields
-      println(action, t)
-      action == actionArg && t.toLong >= startTime && t.toLong < endTimeArg
-    }
-    .groupBy('iid) {
-      _.foldLeft('t -> 'timeseries)(Array.fill[Int](numWindowsArg)(0)) {
-        (seriesSoFar: Array[Int], t: String) =>
-          // seriesSoFar(((t.toLong - startTime) / windowSizeArg).toInt) += 1
-          seriesSoFar(((0) / windowSizeArg).toInt) += 1
-          seriesSoFar
-      }
-    }
-    .map('timeseries -> 'timeseriesstring) {
-      timeseries: Array[Int] =>
-        timeseries.mkString(",")
-    }
-    .project('iid, 'timeseriesstring)
+  u2i.project('action, 'iid)
     .write(timeseriesSink)
-  println("done")
+  // u2i.joinWithSmaller('iid -> 'iidx, items)
+  // .filter('action, 't) { fields: (String, String) =>
+  //   val (action, t) = fields
+  //   println(action, t)
+  //   action == actionArg && t.toLong >= startTime && t.toLong < endTimeArg
+  // }
+  // .groupBy('iid) {
+  //   _.foldLeft('t -> 'timeseries)(Array.fill[Int](numWindowsArg)(0)) {
+  //     (seriesSoFar: Array[Int], t: String) =>
+  //       // seriesSoFar(((t.toLong - startTime) / windowSizeArg).toInt) += 1
+  //       seriesSoFar(((0) / windowSizeArg).toInt) += 1
+  //       seriesSoFar
+  //   }
+  // }
+  // .map('timeseries -> 'timeseriesstring) {
+  //   timeseries: Array[Int] =>
+  //     timeseries.mkString(",")
+  // }
+  // .project('iid, 'timeseriesstring)
+  // .write(timeseriesSink)
+
+  items
+    // .mapTo(('iidx, 'itypes) -> ('iidx, 'itypes)) { fields: (String, List[String]) =>
+    //   val (iidx, itypes) = fields
+    //   (iidx, itypes.mkString(","))
+    // }
+    .write(selectedItemsSink)
 
 }
