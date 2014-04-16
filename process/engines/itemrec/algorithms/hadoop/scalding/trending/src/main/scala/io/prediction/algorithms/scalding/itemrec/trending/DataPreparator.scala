@@ -76,7 +76,6 @@ class DataPreparator(args: Args) extends Job(args) {
   //   case _ => -1
   // }
   val startTime = endTimeArg - windowSizeArg * numWindowsArg
-  println(startTime, endTimeArg)
 
   /**
    * source
@@ -101,34 +100,30 @@ class DataPreparator(args: Args) extends Job(args) {
   /**
    * computation
    */
-  u2i.project('action, 'iid)
+  u2i.joinWithSmaller('iid -> 'iidx, items)
+    .filter('action, 't) { fields: (String, String) =>
+      val (action, t) = fields
+      action == actionArg && t.toLong >= startTime && t.toLong < endTimeArg
+    }
+    .groupBy('iid) {
+      _.foldLeft('t -> 'timeseries)(Array.fill[Int](numWindowsArg)(0)) {
+        (seriesSoFar: Array[Int], t: String) =>
+          seriesSoFar(((t.toLong - startTime) / windowSizeArg).toInt) += 1
+          seriesSoFar
+      }
+    }
+    .map('timeseries -> 'timeseriesstring) {
+      timeseries: Array[Int] =>
+        timeseries.mkString(",")
+    }
+    .project('iid, 'timeseriesstring)
     .write(timeseriesSink)
-  // u2i.joinWithSmaller('iid -> 'iidx, items)
-  // .filter('action, 't) { fields: (String, String) =>
-  //   val (action, t) = fields
-  //   println(action, t)
-  //   action == actionArg && t.toLong >= startTime && t.toLong < endTimeArg
-  // }
-  // .groupBy('iid) {
-  //   _.foldLeft('t -> 'timeseries)(Array.fill[Int](numWindowsArg)(0)) {
-  //     (seriesSoFar: Array[Int], t: String) =>
-  //       // seriesSoFar(((t.toLong - startTime) / windowSizeArg).toInt) += 1
-  //       seriesSoFar(((0) / windowSizeArg).toInt) += 1
-  //       seriesSoFar
-  //   }
-  // }
-  // .map('timeseries -> 'timeseriesstring) {
-  //   timeseries: Array[Int] =>
-  //     timeseries.mkString(",")
-  // }
-  // .project('iid, 'timeseriesstring)
-  // .write(timeseriesSink)
 
   items
-    // .mapTo(('iidx, 'itypes) -> ('iidx, 'itypes)) { fields: (String, List[String]) =>
-    //   val (iidx, itypes) = fields
-    //   (iidx, itypes.mkString(","))
-    // }
+    .mapTo(('iidx, 'itypes) -> ('iidx, 'itypes)) { fields: (String, List[String]) =>
+      val (iidx, itypes) = fields
+      (iidx, itypes.mkString(","))
+    }
     .write(selectedItemsSink)
 
 }
