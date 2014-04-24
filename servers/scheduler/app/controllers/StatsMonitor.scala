@@ -40,8 +40,8 @@ trait StatsMonitor {
     pids = pids ++ procFinder.find("State.name.ct=java")
 
     //Get MongoDB PIDs
-    if (config.settingsDbTyep == "mongodb") {
-      pids =  pids ++ procFinder.find("State.name.ct=mongo")
+    if (config.settingsDbType == "mongodb") {
+      pids = pids ++ procFinder.find("State.name.ct=mongo")
     }
 
     return pids
@@ -69,13 +69,13 @@ trait StatsMonitor {
     return total
   }
 
-  def getMongoDisk : Long = {
-    def getFileSize(hostCmd: String) = {
+  def getMongoDisk: Double = {
+    def getFileSize(hostCmd: Seq[String]) = {
       val output = hostCmd.!!
       val reg = """\"fileSize\"(\s):(\s)(\d+),""".r
       val reg(a, b, size) = output
 
-      size.toLong
+      size.toDouble
     }
     val fileSizes = hostCmds map getFileSize
 
