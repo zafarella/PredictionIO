@@ -1,12 +1,14 @@
-package io.prediction.algorithms.scalding.itemrec.knnitembased
+package io.prediction.algorithms.scalding.itemrec.trending
 
 import com.twitter.scalding._
 
+import io.prediction.commons.scalding.appdata.Users
 import io.prediction.commons.filepath.{ DataFile, AlgoFile }
 import io.prediction.commons.scalding.modeldata.ItemRecScores
 
 /**
  * Source:
+ *   selectedItems.tsv
  *   itemRecScores.tsv
  * Sink:
  *   itemRecScores DB
@@ -61,29 +63,35 @@ class ModelConstructor(args: Args) extends Job(args) {
   val DEBUG_TEST = debugArg.contains("test") // test mode
 
   val modelSetArg = args("modelSet").toBoolean
+  val numRecommendationsArg = args("numRecommendations").toInt
 
   /**
    * input
    */
-  val score = Tsv(AlgoFile(hdfsRootArg, appidArg, engineidArg, algoidArg, evalidArg, "itemRecScores.tsv")).read
-    .mapTo((0, 1, 2) -> ('uid, 'iid, 'score)) { fields: (String, String, Double) => fields }
+  val scores = Tsv(AlgoFile(hdfsRootArg, appidArg, engineidArg, algoidArg, evalidArg, "itemRecScores.tsv")).read
+    .mapTo((0, 1) -> ('iid, 'score)) { fields: (String, Double) => fields }
 
   val items = Tsv(DataFile(hdfsRootArg, appidArg, engineidArg, algoidArg, evalidArg, "selectedItems.tsv")).read
-    .mapTo((0, 1) -> ('iidx, 'itypes)) { fields: (String, String) =>
+    .mapTo((0, 1) -> ('iidx, 'itypes, 'itemKey)) { fields: (String, String) =>
       val (iidx, itypes) = fields // itypes are comma-separated String
-
-      (iidx, itypes.split(",").toList)
+      (iidx, itypes.split(",").toList, 1)
     }
+
+  val users = Users(appId = appidArg, dbType = dbTypeArg, dbName = dbNameArg, dbHost = dbHostArg, dbPort = dbPortArg).readData('uid)
+  val usersWithKey = users.map(() -> 'userKey) { u: Unit => 1 }
 
   /**
    * process & output
    */
-  val p = score.joinWithSmaller('iid -> 'iidx, items) // get items info for each iid
+  val p = scores.joinWithSmaller('iid -> 'iidx, items) // get items info for each iid
+    // .groupAll { _.sortBy('score).reverse.toList[(String, Double, List[String])](('iid, 'score, 'itypes) -> 'iidsList) }
+    .joinWithLarger('itemKey -> 'userKey, usersWithKey)
     .project('uid, 'iid, 'score, 'itypes)
-    .groupBy('uid) { _.sortBy('score).reverse.toList[(String, Double, List[String])](('iid, 'score, 'itypes) -> 'iidsList) }
+    // .groupBy('uid) { _.sortedReverseTake[(Double, String)](('score, 'iid) -> 'pscore, numRecommendationsArg).toList[(String, Double, List[String])](('iid, 'score, 'itypes) -> 'iidsList) }
+    .groupBy('uid) { _.sortBy('score).take(numRecommendationsArg) }
+    .groupBy('uid) { _.toList[(String, Double, List[String])](('iid, 'score, 'itypes) -> 'iidsList) }
 
   val src = ItemRecScores(dbType = dbTypeArg, dbName = dbNameArg, dbHost = dbHostArg, dbPort = dbPortArg, algoid = algoidArg, modelset = modelSetArg)
-
   p.then(src.writeData('uid, 'iidsList, algoidArg, modelSetArg) _)
 
 }
