@@ -9,9 +9,6 @@ import scala.sys.process._
 import org.hyperic.sigar._
 import org.hyperic.sigar.ptql._
 
-// Hadoop -> Use metrics2 api?
-// Mongodb -> Use command line + javascript script
-
 trait StatsMonitor {
   this: Controller =>
 
@@ -30,20 +27,24 @@ trait StatsMonitor {
     config.modeldataTrainingDbHost + ":" + config.modeldataTrainingDbPort + "/" + config.modeldataTrainingDbName,
     config.settingsDbHost + ":" + config.settingsDbPort + "/" + config.settingsDbName
   ) distinct
+
   val hostCmds = hosts map {
     host => Seq("mongo", host, "--eval", "'printjson(db.stats())'")
   }
 
   def getPIDs: Array[Long] = {
     val procFinder = new ProcessFinder(sigar)
+    var pids = Array[Long]()
 
     //Get Java PIDs
-    val java = procFinder.find("State.name.ct=java")
+    pids = pids ++ procFinder.find("State.name.ct=java")
 
     //Get MongoDB PIDs
-    val mongo = procFinder.find("State.name.ct=mongo")
+    if (config.settingsDbTyep == "mongodb") {
+      pids =  pids ++ procFinder.find("State.name.ct=mongo")
+    }
 
-    return mongo ++ java
+    return pids
   }
 
   /**
@@ -74,6 +75,19 @@ trait StatsMonitor {
     Ok(Json.obj("cpu" -> (total)))
   }
 
+  def getMongoDisk : Long = {
+    def getFileSize(hostCmd: String) = {
+      val output = hostCmd.!!
+      val reg = """\"fileSize\"(\s):(\s)(\d+),""".r
+      val reg(a, b, size) = output
+
+      size.toLong
+    }
+    val fileSizes = hostCmds map getFileSize
+
+    return fileSizes reduce (_ + _)
+  }
+
   /**
    * Get total Disk Space used
    */
@@ -87,15 +101,9 @@ trait StatsMonitor {
     total += dir.getDiskUsage()
 
     //Disk usage for MongoDB
-    def getFileSize(hostCmd: Seq[String]) = {
-      val output = hostCmd.!!
-      val reg = """\"fileSize\"(\s):(\s)(\d+),""".r
-      val reg(a, b, size) = output
-
-      size.toLong
+    if (config.settingsDbType == "mongodb") {
+      total += getMongoDisk
     }
-    val fileSizes = hostCmds map getFileSize
-    total += fileSizes reduce (_ + _)
 
     Ok(Json.obj("disk" -> (total)))
   }
