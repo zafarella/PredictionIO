@@ -17,6 +17,8 @@ libraryDependencies ++= Seq(
 
 javaOptions in Test += "-Dconfig.file=conf/test.conf"
 
+javaOptions += "-Djava.library.path=lib/"
+
 play.Project.playScalaSettings
 
 scalariformSettings
