@@ -3,6 +3,7 @@ package io.prediction.scheduler
 import io.prediction.commons.Config
 import play.api.mvc._
 import play.api.libs.json._
+import play.api.Logger
 import scala.collection.JavaConverters._
 import scala.collection.Seq
 import scala.sys.process._
@@ -18,7 +19,8 @@ trait StatsMonitor {
   val dir = new DirUsage
 
   val pids = getPIDs
-  val config = new Config
+  var config = new Config()
+
   val hosts = Seq(
     config.appdataDbHost + ":" + config.appdataDbPort + "/" + config.appdataDbName,
     config.appdataTrainingDbHost + ":" + config.appdataTrainingDbPort + "/" + config.appdataTrainingDbName,
@@ -29,19 +31,23 @@ trait StatsMonitor {
   ) distinct
 
   val hostCmds = hosts map {
-    host => Seq("mongo", host, "--eval", "'printjson(db.stats())'")
+    host => Seq("mongo", host, "--eval", "printjson(db.stats())")
   }
 
   def getPIDs: Array[Long] = {
+    if (config == null) {
+      config = new Config()
+    }
+
     val procFinder = new ProcessFinder(sigar)
     var pids = Array[Long]()
 
     //Get Java PIDs
-    pids = pids ++ procFinder.find("State.name.ct=java")
+    pids = pids ++ procFinder.find("State.Name.ct=java")
 
     //Get MongoDB PIDs
     if (config.settingsDbType == "mongodb") {
-      pids = pids ++ procFinder.find("State.name.ct=mongo")
+      pids = pids ++ procFinder.find("State.Name.ct=mongo")
     }
 
     return pids
@@ -72,8 +78,12 @@ trait StatsMonitor {
   def getMongoDisk: Double = {
     def getFileSize(hostCmd: Seq[String]) = {
       val output = hostCmd.!!
-      val reg = """\"fileSize\"(\s):(\s)(\d+),""".r
-      val reg(a, b, size) = output
+
+      val reg = """"fileSize\" : (\d+),""".r
+      val size: String = reg findFirstIn output match {
+        case Some(reg(s)) => s
+        case None => "0"
+      }
 
       size.toDouble
     }
@@ -86,13 +96,19 @@ trait StatsMonitor {
    * Get total Disk Space used
    */
   private def getDisk: Double = {
+    if (config == null) {
+      config = new Config()
+    }
     var total = 0.0
 
     //HDFS Disk Usage
     var hdfsDir = config.settingsHdfsRoot
-    dir.gather(sigar, hdfsDir)
-
-    total += dir.getDiskUsage()
+    try {
+      dir.gather(sigar, hdfsDir)
+      total += dir.getDiskUsage()
+    } catch {
+      case e: Exception => Logger.warn("Could not get HDFS Directory at " + hdfsDir)
+    }
 
     //Disk usage for MongoDB
     if (config.settingsDbType == "mongodb") {
