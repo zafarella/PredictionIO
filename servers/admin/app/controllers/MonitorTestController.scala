@@ -14,8 +14,24 @@ class MonitorTestController extends Controller {
       disk <- WS.url(s"${settingsSchedulerUrl}/monitor/usedDiskUsage").get()
     } yield List(cpu, ram, disk)
 
+    var c = 0.0
+    var r = 0.0
+    var d = 0.0
+
     request onSuccess {
-      case res => Ok(views.html.monitor.monitor(res[0], res[1], res[2]))
+      case cpu :: ram :: disk :: List() =>
+        c += (cpu.json \ "cpu").validate[Double].get
+        r += (cpu.json \ "cpu").validate[Double].get
+        d += (cpu.json \ "cpu").validate[Double].get
     }
+    /*
+       Ok(views.html.monitor.monitor(
+          (cpu.json \ "cpu").validate[Double].get, 
+          (ram.json \ "ram").validate[Double].get, 
+          (disk.json \ "disk").validate[Double].get
+          )
+        )*/
+
+    Ok(views.html.monitor.monitor(c, r, d))
   }
 }
