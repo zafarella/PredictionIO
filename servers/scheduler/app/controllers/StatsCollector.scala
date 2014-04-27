@@ -70,4 +70,14 @@ object StatsCollector extends Controller {
     Ok("Started Collector")
   }
 
+  def getStats(n: Int) = Action {
+    val order = MongoDBObject("timestamp" -> -1)
+    val stats = coll.find().sort(order).limit(n)
+    val json = "[%s]".format(
+      stats.toList.mkString(",")
+    )
+
+    Ok(json).as("application/json")
+  }
+
 }
