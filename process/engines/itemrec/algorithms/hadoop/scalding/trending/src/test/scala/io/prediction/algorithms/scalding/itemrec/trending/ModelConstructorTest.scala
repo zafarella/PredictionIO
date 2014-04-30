@@ -73,4 +73,18 @@ class ModelConstructorTest extends Specification with TupleConversions {
     test(3, test1Items, test1ItemRecScores, test1Users, test1Output)
   }
 
+  "itemrec.trending ModelConstructor" should {
+    test(5, test1Items, test1ItemRecScores, test1Users, test1Output)
+  }
+
+  /* test 2 */
+  val test2Output = List(
+    ("u0", "i0,i2", "1.23,0.456", "[t1,t2,t3],[t2,t3]"),
+    ("u1", "i0,i2", "1.23,0.456", "[t1,t2,t3],[t2,t3]"),
+    ("u2", "i0,i2", "1.23,0.456", "[t1,t2,t3],[t2,t3]"))
+
+  "itemrec.trending ModelConstructor" should {
+    test(2, test1Items, test1ItemRecScores, test1Users, test2Output)
+  }
+
 }

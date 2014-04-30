@@ -1,7 +1,6 @@
 package io.prediction.algorithms.scalding.itemrec.knnitembased
 
 import com.twitter.scalding._
-import com.twitter.scalding.mathematics.Matrix
 import io.prediction.commons.filepath.{ DataFile, AlgoFile }
 
 import cascading.pipe.Pipe
@@ -41,16 +40,18 @@ class Trending(args: Args) extends Job(args) {
   val ratingsRaw = Tsv(DataFile(hdfsRootArg, appidArg, engineidArg, algoidArg, evalidArg, "ratings.tsv")).read
   val itemRecScores = Tsv(AlgoFile(hdfsRootArg, appidArg, engineidArg, algoidArg, evalidArg, "itemRecScores.tsv"))
 
-  // start computation  
+  // start computation
   val ratings = ratingsRaw.mapTo((0, 1) -> ('iid, 'timeseries)) {
     fields: (String, String) =>
       val (iid, timeseriesstring) = fields
       (iid, timeseriesstring.split(",").map(_.toInt))
   }
 
-  ratings.map('timeseries -> 'predictions) {
+  ratings.map('timeseries -> 'score) {
     timeseries: Array[Int] =>
-      null
-  }.write(itemRecScores)
+      0
+  }
+    .project('iid, 'score)
+    .write(itemRecScores)
 
 }

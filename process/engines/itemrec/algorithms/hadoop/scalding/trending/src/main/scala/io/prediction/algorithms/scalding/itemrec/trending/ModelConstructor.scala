@@ -88,8 +88,8 @@ class ModelConstructor(args: Args) extends Job(args) {
     .joinWithLarger('itemKey -> 'userKey, usersWithKey)
     .project('uid, 'iid, 'score, 'itypes)
     // .groupBy('uid) { _.sortedReverseTake[(Double, String)](('score, 'iid) -> 'pscore, numRecommendationsArg).toList[(String, Double, List[String])](('iid, 'score, 'itypes) -> 'iidsList) }
-    .groupBy('uid) { _.sortBy('score).take(numRecommendationsArg) }
-    .groupBy('uid) { _.toList[(String, Double, List[String])](('iid, 'score, 'itypes) -> 'iidsList) }
+    .groupBy('uid) { _.sortBy('score).reverse.take(numRecommendationsArg) }
+    .groupBy('uid) { _.sortBy('score).reverse.toList[(String, Double, List[String])](('iid, 'score, 'itypes) -> 'iidsList) }
 
   val src = ItemRecScores(dbType = dbTypeArg, dbName = dbNameArg, dbHost = dbHostArg, dbPort = dbPortArg, algoid = algoidArg, modelset = modelSetArg)
   p.then(src.writeData('uid, 'iidsList, algoidArg, modelSetArg) _)
