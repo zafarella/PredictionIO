@@ -3,11 +3,9 @@ package io.prediction.algorithms.scalding.itemrec.trending
 import breeze.linalg._
 
 /**
- * Created by jeremy on 3/3/14.
- * https://github.com/nchandra/ExponentialSmoothing/blob/master/src/main/java/com/nc/tsa/HoltWinters.java
- * https://github.com/optimistoolkit/optimistoolkit/blob/master/OptimisY3/TrustFramework/TrustFrameworkService/IPTrustFramework/src/main/java/eu/optimis/tf/ip/service/operators/ExponentialSmoothingAggregator.java
+ * http://www.itl.nist.gov/div898/handbook/pmc/section4/pmc435.htm
  */
-class HoltWintersModel(alpha: Double, beta: Double, gamma: Double, period: Integer) extends IterativeModel {
+class HoltWintersModel(alpha: Double, beta: Double, gamma: Double, period: Integer) extends ForecastingModel {
 
   require(alpha >= 0 && alpha <= 1)
   require(beta >= 0 && beta <= 1)

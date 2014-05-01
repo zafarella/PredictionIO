@@ -1,6 +1,7 @@
-package io.prediction.algorithms.scalding.itemrec.knnitembased
+package io.prediction.algorithms.scalding.itemrec.trending
 
 import com.twitter.scalding._
+import breeze.linalg._
 import io.prediction.commons.filepath.{ DataFile, AlgoFile }
 
 import cascading.pipe.Pipe
@@ -36,6 +37,11 @@ class Trending(args: Args) extends Job(args) {
   val evalidArg = args.optional("evalid") map (x => x.toInt)
 
   val numRecommendationsArg = args("numRecommendations").toInt
+  val filterArg = args("filter").toBoolean
+  val filterTypeArg = args("filterType")
+  val forecastTypeArg = args("forecastType")
+  val numForecastsArg = args("numForecasts").toInt
+  val scoreTypeArg = args("scoreType")
 
   val ratingsRaw = Tsv(DataFile(hdfsRootArg, appidArg, engineidArg, algoidArg, evalidArg, "ratings.tsv")).read
   val itemRecScores = Tsv(AlgoFile(hdfsRootArg, appidArg, engineidArg, algoidArg, evalidArg, "itemRecScores.tsv"))
@@ -49,7 +55,34 @@ class Trending(args: Args) extends Job(args) {
 
   ratings.map('timeseries -> 'score) {
     timeseries: Array[Int] =>
-      0
+      // do any filtering/smoothing
+      val timeseriesVec = DenseVector[Double](timeseries.map(_.toDouble))
+      val filtered = filterTypeArg match {
+        case "movingAverage" => timeseriesVec
+        case "savitzkyGolay" => new SavitzkyGolayFilter(5).filter(timeseriesVec)
+        case _ => timeseriesVec
+      }
+
+      // make forcasts
+      val alpha = 0.5 // TODO what are we going to do for these?
+      val gamma = 0.5
+      val beta = 0.5
+      val period = 10
+      val forecastModel = forecastTypeArg match {
+        case "doubleExponential" => new DoubleExponentialModel(alpha, gamma)
+        case "tripleExponential" => new HoltWintersModel(alpha, beta, gamma, period)
+      }
+      val forecasts = forecastModel.forecast(filtered, numForecastsArg)
+
+      // now score the data
+      val degree = scoreTypeArg match {
+        case "velocity" => 1
+        case "acceleration" => 2
+      }
+      var polyModel = new PolynomialModel(degree)
+      var score = polyModel.getCoefficients(forecasts)(degree)
+      score -= polyModel.getCoefficients(filtered)(degree)
+      Math.abs(score)
   }
     .project('iid, 'score)
     .write(itemRecScores)

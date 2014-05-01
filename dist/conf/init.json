@@ -5448,6 +5448,137 @@
                 }
             ]
         },
+        "pio-itemrec-distributed-trending": {
+            "name": "Trending Recommender",
+            "description": "Predict trending items using basic time series analysis.",
+            "batchcommands": [
+                "$hadoop$ jar $base$/lib/$pdioItemrecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.DataPreparator --hdfs --dbType $appdataDbType$ --dbName $appdataDbName$ --dbHost $appdataDbHost$ --dbPort $appdataDbPort$ --hdfsRoot $hdfsRoot$ --appid $appid$ --engineid $engineid$ --algoid $algoid$ $itypes$ --endTime $endTime$ --windowSize $windowSize$ --numWindows $numWindows$ --action $action$",
+                "$hadoop$ jar $base$/lib/$pdioItemrecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.ModelConstructor --hdfs --dbType $modeldataDbType$ --dbName $modeldataDbName$ --dbHost $modeldataDbHost$ --dbPort $modeldataDbPort$ --hdfsRoot $hdfsRoot$ --appid $appid$ --engineid $engineid$ --algoid $algoid$ --modelSet $modelset$ --unseenOnly $unseenOnly$ --numRecommendations $numRecommendations$"
+            ],
+            "offlineevalcommands": [
+                "$hadoop$ jar $base$/lib/$pdioItemrecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.DataPreparator --hdfs --dbType $appdataDbType$ --dbName $appdataDbName$ --dbHost $appdataDbHost$ --dbPort $appdataDbPort$ --hdfsRoot $hdfsRoot$ --appid $appid$ --engineid $engineid$ --algoid $algoid$ $itypes$ --endTime $endTime$ --windowSize $windowSize$ --numWindows $numWindows$ --action $action$",
+                "$hadoop$ jar $base$/lib/$pdioItemrecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.ModelConstructor --hdfs --dbType $modeldataDbType$ --dbName $modeldataDbName$ --dbHost $modeldataDbHost$ --dbPort $modeldataDbPort$ --hdfsRoot $hdfsRoot$ --appid $appid$ --engineid $engineid$ --algoid $algoid$ --modelSet $modelset$ --unseenOnly $unseenOnly$ --numRecommendations $numRecommendations$"
+            ],
+            "paramorder": [
+                "endTime",
+                "windowSize",
+                "numWindows",
+                "action"
+            ],
+            "engineinfoid": "itemrec",
+            "techreq": [
+                "Hadoop"
+            ],
+            "datareq": [
+                "Users, Items, and U2I Actions such as Like, Conversion and Rate."
+            ],
+            "params": {
+                "endTime": {
+                    "name": "",
+                    "description": "",
+                    "constraint": {
+                        "paramtype": "integer"
+                    },
+                    "ui": {
+                        "uitype": "text"
+                    },
+                    "defaultvalue": -1
+                },
+                "windowSize": {
+                    "name": "Window Size",
+                    "description": "",
+                    "constraint": {
+                        "paramtype": "integer"
+                    },
+                    "ui" {
+                        "uitype": "selection",
+                        "selections": [
+                            {
+                                "name": "Hour",
+                                "value": "3600"
+                            },
+                            {
+                                "name": "Day",
+                                "value": "86400"
+                            },
+                            {
+                                "name": "Week",
+                                "value": "604800"
+                            }
+                        ]
+                    },
+                    "defaultvalue": 86400
+                },
+                "numWindows": {
+                    "name": "Number of Windows",
+                    "description": "",
+                    "constraint": {
+                        "paramtype": "integer"
+                    },
+                    "ui": {
+                        "uitype": "text"
+                    },
+                    "defaultvalue": 20
+                },
+                "action": {
+                    "name": "Trending Action",
+                    "description": "The type of action to look at.",
+                    "constraint": {
+                        "paramtype": "string"
+                    },
+                    "ui": {
+                        "uitype": "selection",
+                        "selections": [
+                            {
+                                "name": "Rate",
+                                "value": "rate"
+                            },
+                            {
+                                "name": "Like",
+                                "value": "like"
+                            },
+                            {
+                                "name": "Dislike",
+                                "value": "dislike"
+                            },
+                            {
+                                "name": "View",
+                                "value": "view"
+                            },
+                            {
+                                "name": "View Details",
+                                "value": "viewDetails"
+                            },
+                            {
+                                "name": "Conversion",
+                                "value": "conversion"
+                            }
+                        ]
+                    },
+                    "defaultvalue": "view"
+                }
+            },
+            "paramsections": [
+                {
+                    "name": "Parameter Settings",
+                    "sectiontype": "normal",
+                    "subsections": [
+                        {
+                            "name": "Numeric Parameters",
+                            "sectiontype": "tuning",
+                            "params": [
+                                "numFeatures",
+                                "learningRate",
+                                "preventOverfitting",
+                                "randomNoise",
+                                "numIterations",
+                                "learningRateDecay"
+                            ]
+                        }
+                    ]
+                },
+            ]
+        },
         "pio-itemsim-distributed-random": {
             "name": "Random Rank",
             "description": "Predict item similarities randomly.",

@@ -7,7 +7,7 @@ import breeze.linalg._
  * Brown's linear exponential smoothing as found on:
  * http://people.duke.edu/~rnau/411avg.htm
  */
-class BrownsExponentialModel(alpha: Double) extends IterativeModel {
+class BrownsExponentialModel(alpha: Double) extends ForecastingModel {
 
   override def forecast(x: DenseVector[Double], n: Int): DenseVector[Double] = {
     if (x.length < 2)
