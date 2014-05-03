@@ -1,5 +1,6 @@
 @* monitor Template File *@
-@(cpu: Double, ram: Double, disk: Double)
+@(schedulerUrl: String)
+
 
 <h1> This is a Debug Page for PDIOMON </h1>
 
@@ -226,7 +227,7 @@ function initDisk(stats) {
 }
 
 function refresh() {
-  var stats = $.get('TODO', function(data) { return data;});
+  var stats = $.get(schedulerUrl+'/collector/stats/20', function(data) { return data;});
   initCPU(stats);
   initRAM(stats);
   initDisk(stats);
