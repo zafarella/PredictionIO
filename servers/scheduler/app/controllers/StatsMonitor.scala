@@ -53,7 +53,7 @@ trait StatsMonitor {
     return pids
   }
 
-  private def getRam: Double = {
+  def getRam: Double = {
     var total = 0.0
 
     for (pid <- pids) {
@@ -64,7 +64,7 @@ trait StatsMonitor {
     return total
   }
 
-  private def getCpu: Double = {
+  def getCpu: Double = {
     var total = 0.0
 
     for (pid <- pids) {
@@ -95,7 +95,7 @@ trait StatsMonitor {
   /**
    * Get total Disk Space used
    */
-  private def getDisk: Double = {
+  def getDisk: Double = {
     if (config == null) {
       config = new Config()
     }
