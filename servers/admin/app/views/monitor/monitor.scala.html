@@ -27,15 +27,19 @@ body {
 
 </style>
 <body>
+
+<div id="cpu"> </div>
+<div id="ram"> </div>
+<div id="disk"> </div>
+
 <script src="http://d3js.org/d3.v3.js"></script>
+<script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
 <script>
 
-function initCPU(stats) {
+function initCPU(data) {
   var margin = {top: 20, right: 20, bottom: 30, left: 50},
       width = 960 - margin.left - margin.right,
       height = 500 - margin.top - margin.bottom;
-
-  var parseDate = d3.time.format("%d-%b-%y").parse;
 
   var x = d3.time.scale()
       .range([0, width]);
@@ -53,7 +57,7 @@ function initCPU(stats) {
 
   var line = d3.svg.line()
       .x(function(d) { return x(d.date); })
-      .y(function(d) { return y(d.cpu); });
+      .y(function(d) { return y(d.cpuUsage); });
 
   var svg = d3.select("#cpu").append("svg")
       .attr("width", width + margin.left + margin.right)
@@ -61,42 +65,44 @@ function initCPU(stats) {
     .append("g")
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-  d3.json(stats, function(data) {
-    data.forEach(function(d) {
-      d.date = parseDate(d.date);
-      d.cpu = d.cpu;
-    });
+  x.domain(d3.extent(data, function(d) { return d.date; }));
+  y.domain([0, d3.max(data, function(d) { return d.cpuUsage; })]);
 
-    x.domain(d3.extent(data, function(d) { return d.date; }));
-    y.domain(d3.extent(data, function(d) { return d.cpu; }));
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis);
 
-    svg.append("g")
-        .attr("class", "x axis")
-        .attr("transform", "translate(0," + height + ")")
-        .call(xAxis);
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+    .append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .text("CPU Usage (%)");
 
-    svg.append("g")
-        .attr("class", "y axis")
-        .call(yAxis)
-      .append("text")
-        .attr("transform", "rotate(-90)")
-        .attr("y", 6)
-        .attr("dy", ".71em")
-        .style("text-anchor", "end")
-        .text("CPU Usage (%)");
-
-    svg.append("path")
-        .datum(data)
-        .attr("class", "line")
-        .attr("d", line);
-  });
+  svg.append("path")
+      .datum(data)
+      .attr("class", "line")
+      .attr("d", line);
 }
-function initRAM(stats) {
+function initRAM(data) {
+  var max = d3.max(data, function(d) { return d.ramUsage });
+  var yAxisName = "RAM Usage (MB)";
+  var maxPadding = 100;
+  if (max > 1000) {
+    yAxisName = "RAM Usage (GB)";
+    maxPadding = 1;
+    data.forEach(function(d) {
+      d.ramUsage = d.ramUsage/1000;
+    });
+  }
+
   var margin = {top: 20, right: 20, bottom: 30, left: 50},
       width = 960 - margin.left - margin.right,
       height = 500 - margin.top - margin.bottom;
-
-  var parseDate = d3.time.format("%d-%b-%y").parse;
 
   var x = d3.time.scale()
       .range([0, width]);
@@ -114,50 +120,52 @@ function initRAM(stats) {
 
   var line = d3.svg.line()
       .x(function(d) { return x(d.date); })
-      .y(function(d) { return y(d.ram); });
+      .y(function(d) { return y(d.ramUsage); });
 
   var svg = d3.select("#ram").append("svg")
       .attr("width", width + margin.left + margin.right)
       .attr("height", height + margin.top + margin.bottom)
-    .append("g")
+      .append("g")
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-  d3.json(stats, function(data) {
-    data.forEach(function(d) {
-      d.date = parseDate(d.date);
-      d.ram = d.ram;
-    });
+  x.domain(d3.extent(data, function(d) { return d.date; }));
+  y.domain([0, d3.max(data, function(d) { return d.ramUsage; }) + maxPadding]);
 
-    x.domain(d3.extent(data, function(d) { return d.date; }));
-    y.domain(d3.extent(data, function(d) { return d.cpu; }));
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis);
 
-    svg.append("g")
-        .attr("class", "x axis")
-        .attr("transform", "translate(0," + height + ")")
-        .call(xAxis);
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+    .append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .text(yAxisName);
 
-    svg.append("g")
-        .attr("class", "y axis")
-        .call(yAxis)
-      .append("text")
-        .attr("transform", "rotate(-90)")
-        .attr("y", 6)
-        .attr("dy", ".71em")
-        .style("text-anchor", "end")
-        .text("RAM Usage (GB)");
-
-    svg.append("path")
-        .datum(data)
-        .attr("class", "line")
-        .attr("d", line);
-  });
+  svg.append("path")
+      .datum(data)
+      .attr("class", "line")
+      .attr("d", line);
 }
-function initDisk(stats) {
+function initDisk(data) {
+  var max = d3.max(data, function(d) { return d.diskUsage });
+  var yAxisName = "Disk Usage (MB)";
+  var maxPadding = 100;
+  if (max > 1000) {
+    yAxisName = "Disk Usage (GB)";
+    maxPadding = 1;
+    data.forEach(function(d) {
+      d.diskUsage = d.diskUsage/1000;
+    });
+  }
+
   var margin = {top: 20, right: 20, bottom: 30, left: 50},
       width = 960 - margin.left - margin.right,
       height = 500 - margin.top - margin.bottom;
-
-  var parseDate = d3.time.format("%d-%b-%y").parse;
 
   var x = d3.time.scale()
       .range([0, width]);
@@ -175,7 +183,7 @@ function initDisk(stats) {
 
   var line = d3.svg.line()
       .x(function(d) { return x(d.date); })
-      .y(function(d) { return y(d.disk); });
+      .y(function(d) { return y(d.diskUsage); });
 
   var svg = d3.select("#disk").append("svg")
       .attr("width", width + margin.left + margin.right)
@@ -183,45 +191,52 @@ function initDisk(stats) {
     .append("g")
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-  d3.json(stats, function(data) {
-    data.forEach(function(d) {
-      d.date = parseDate(d.date);
-      d.disk = d.disk;
-    });
+  x.domain(d3.extent(data, function(d) { return d.date; }));
+  y.domain([0, d3.max(data, function(d) { return d.diskUsage; }) + maxPadding]);
 
-    x.domain(d3.extent(data, function(d) { return d.date; }));
-    y.domain(d3.extent(data, function(d) { return d.cpu; }));
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis);
 
-    svg.append("g")
-        .attr("class", "x axis")
-        .attr("transform", "translate(0," + height + ")")
-        .call(xAxis);
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+    .append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .text(yAxisName);
 
-    svg.append("g")
-        .attr("class", "y axis")
-        .call(yAxis)
-      .append("text")
-        .attr("transform", "rotate(-90)")
-        .attr("y", 6)
-        .attr("dy", ".71em")
-        .style("text-anchor", "end")
-        .text("Disk Usage (GB)");
+  svg.append("path")
+      .datum(data)
+      .attr("class", "line")
+      .attr("d", line);
+}
 
-    svg.append("path")
-        .datum(data)
-        .attr("class", "line")
-        .attr("d", line);
+function showGraphs(data) {
+  console.log(data);
+
+  data.forEach(function(d) {
+    d.date = new Date(d['timestamp']*1000);
+    d.cpuUsage = d['cpuUsage'] * 100;
   });
+
+  console.log(data);
+
+  $("#cpu").empty();
+  initCPU(data);
+  $("#ram").empty();
+  initRAM(data);
+  $("#disk").empty();
+  initDisk(data);
 }
 
 function refresh() {
-  var stats = $.get(schedulerUrl+'/collector/stats/20', function(data) { return data;});
-  initCPU(stats);
-  initRAM(stats);
-  initDisk(stats);
+  var stats = $.getJSON('../collector/stats/100', showGraphs);
 }
 
-refresh();
 var refreshInterval = setInterval(refresh(), 30000);
 
 </script>

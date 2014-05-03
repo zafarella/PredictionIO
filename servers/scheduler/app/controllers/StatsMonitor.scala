@@ -58,10 +58,10 @@ trait StatsMonitor {
 
     for (pid <- pids) {
       mem.gather(sigar, pid)
-      total += mem.getSize;
+      total += mem.getResident;
     }
 
-    return total
+    return total / 1048576
   }
 
   def getCpu: Double = {
@@ -115,7 +115,7 @@ trait StatsMonitor {
       total += getMongoDisk
     }
 
-    return total
+    return total / 1048576
   }
 
   /**
