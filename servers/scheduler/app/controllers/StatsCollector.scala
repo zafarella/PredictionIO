@@ -7,7 +7,7 @@ import play.api.mvc._
 import com.mongodb.casbah.Imports._
 import play.api.libs.json._
 import StatsMonitor._
-import play.api.libs.concurrent.Akka
+import play.Logger
 
 object StatsCollector extends Controller {
 
@@ -47,27 +47,26 @@ object StatsCollector extends Controller {
 
   //Function runs continuously and stores data in the given format
   def storeStats() {
+    Logger.info("Storing Stats Collector")
     while (true) {
-      val timestamp = System.currentTimeMillis / 1000
+      try {
+        val timestamp = System.currentTimeMillis / 1000
 
-      //TODO: Get the following data from the API functions
-      val cpuUsage = getCpu
-      val ramUsage = getRam
-      val diskUsage = getDisk
+        //TODO: Get the following data from the API functions
+        val cpuUsage = getCpu
+        val ramUsage = getRam
+        val diskUsage = getDisk
 
-      val dbentry = getMongoObject(timestamp, cpuUsage, ramUsage, diskUsage)
-
-      coll.insert(dbentry)
+        val dbentry = getMongoObject(timestamp, cpuUsage, ramUsage, diskUsage)
+        coll.insert(dbentry)
+      } catch {
+        case e: Exception => {
+          Logger.error("Error inserting Stat to DB... Continuing...")
+        }
+      }
 
       Thread sleep Refresh
     }
-  }
-
-  def startCollector() = Action {
-    val starter = Akka.future {
-      storeStats()
-    }
-    Ok("Started Collector")
   }
 
   def getStats(n: Int) = Action {
