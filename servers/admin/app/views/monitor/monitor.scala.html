@@ -216,14 +216,10 @@ function initDisk(data) {
 }
 
 function showGraphs(data) {
-  console.log(data);
-
   data.forEach(function(d) {
     d.date = new Date(d['timestamp']*1000);
     d.cpuUsage = d['cpuUsage'] * 100;
   });
-
-  console.log(data);
 
   $("#cpu").empty();
   initCPU(data);
@@ -234,7 +230,7 @@ function showGraphs(data) {
 }
 
 function refresh() {
-  var stats = $.getJSON('../collector/stats/100', showGraphs);
+  var stats = $.getJSON('../collector/stats/1000', showGraphs);
 }
 
 var refreshInterval = setInterval(refresh(), 30000);
