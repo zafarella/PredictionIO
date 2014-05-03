@@ -26,6 +26,4 @@ GET     /monitor/cpuUsage                         io.prediction.scheduler.StatsM
 GET     /monitor/usedDiskSpace                    io.prediction.scheduler.StatsMonitor.getUsedDiskSpace()
 GET     /monitor/stats                            io.prediction.scheduler.StatsMonitor.getStats()
 
-GET 	/collector/start						 io.prediction.scheduler.StatsCollector.startCollector()
-
 GET   	/collector/stats/:numStats 						io.prediction.scheduler.StatsCollector.getStats(numStats: Int)
