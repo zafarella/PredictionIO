@@ -120,7 +120,7 @@
 
 				</div>
         <div class="modal-header">
-          <h5>System Monitor</h5>
+          <h5>System Monitor</h5><i class="icon-refresh" id="refreshMonitor"></i>
         <div>
         <div class="modal-container">
           <section class="modal-content">
@@ -136,6 +136,10 @@
               <div class="modal-item">
                 <h4>Disk Usage</h4>
                 <div id="disk"></div>
+              </div>
+              <div class="modal-item">
+                <h4>Job Completion</h4>
+                <div id="jobs"></div>
               </div>
             </div>
           </section>
@@ -324,6 +328,71 @@
         .attr("d", line);
   }
 
+  function initJobs(data) {
+    var jobs = {};
+    
+    data.forEach(function(d) {
+      $.each(d.jobs, function(name, value) {
+        if (!(name in jobs)) {
+          obj[name] = true;
+        }
+      });
+    });
+
+    var margin = {top: 20, right: 20, bottom: 30, left: 50},
+        width = 960 - margin.left - margin.right,
+        height = 500 - margin.top - margin.bottom;
+
+    var x = d3.time.scale()
+        .range([0, width]);
+
+    var y = d3.scale.linear()
+        .range([height, 0]);
+
+    var xAxis = d3.svg.axis()
+        .scale(x)
+        .orient("bottom");
+
+    var yAxis = d3.svg.axis()
+        .scale(y)
+        .orient("left");
+
+    var svg = d3.select("#jobs").append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    x.domain(d3.extent(data, function(d) { return d.date; }));
+    y.domain([0, 100]);
+
+    svg.append("g")
+        .attr("class", "x axis")
+        .attr("transform", "translate(0," + height + ")")
+        .call(xAxis);
+
+    svg.append("g")
+        .attr("class", "y axis")
+        .call(yAxis)
+      .append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 6)
+        .attr("dy", ".71em")
+        .style("text-anchor", "end")
+        .text("Job Completion(%)");
+
+    $.each (jobs, function(job, value) {
+      var line = d3.svg.line()
+          .x(function(d) { return x(d.date); })
+          .y(function(d) { return y(d.jobs[job])*100; });
+
+      svg.append("path")
+         .datum(data)
+         .attr("class", "line")
+         .attr("d", line);
+    });
+  }
+
   function showGraphs(data) {
     data.forEach(function(d) {
       d.date = new Date(d['timestamp']*1000);
@@ -336,11 +405,16 @@
     initRAM(data);
     $("#disk").empty();
     initDisk(data);
+    $("#jobs").empty();
+    initJobs(data);
   }
 
   function refresh() {
     var stats = $.getJSON('../collector/stats/1000', showGraphs);
   }
+  $("#refreshMonitor").click(function() {
+    refresh();
+  });
   var refreshInterval = setInterval(refresh(), 30000);
 %>
 </script>
