@@ -34,13 +34,18 @@ object StatsCollector extends Controller {
   }
   */
 
-  def getMongoObject(timestamp: Long, cpuUsage: Double, ramUsage: Double, diskUsage: Double) = {
+  def getMongoObject(timestamp: Long, cpuUsage: Double, ramUsage: Double, diskUsage: Double, jobs: JsArray) = {
+    val mJobs: Seq[DBObject] = (jobs.value) map {
+      v => MongoDBObject((v \ "name").as[String] -> (v \ "value").as[Double])
+    }
+    val jobObjects: DBObject = if (mJobs.isEmpty) MongoDBObject() else mJobs reduce (_ ++ _)
 
     MongoDBObject(
       "timestamp" -> timestamp,
       "cpuUsage" -> cpuUsage,
       "ramUsage" -> ramUsage,
-      "diskUsage" -> diskUsage
+      "diskUsage" -> diskUsage,
+      "jobs" -> jobObjects
     )
 
   }
@@ -56,12 +61,13 @@ object StatsCollector extends Controller {
         val cpuUsage = getCpu
         val ramUsage = getRam
         val diskUsage = getDisk
+        val jobs = getJobs
 
-        val dbentry = getMongoObject(timestamp, cpuUsage, ramUsage, diskUsage)
+        val dbentry = getMongoObject(timestamp, cpuUsage, ramUsage, diskUsage, jobs)
         coll.insert(dbentry)
       } catch {
         case e: Exception => {
-          Logger.error("Error inserting Stat to DB... Continuing...")
+          Logger.error("Error inserting Stat to DB... Continuing...", e)
         }
       }
 

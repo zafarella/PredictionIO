@@ -3,6 +3,8 @@ package io.prediction.scheduler
 import io.prediction.commons.Config
 import play.api.mvc._
 import play.api.libs.json._
+import play.api.libs.json.JsNull
+import play.api.libs.json.Json
 import play.api.Logger
 import scala.collection.JavaConverters._
 import scala.collection.Seq
@@ -118,6 +120,98 @@ trait StatsMonitor {
     return total / 1048576
   }
 
+  def getHadoopJobs: JsArray = {
+    val hadoop = (config.settingsHadoopHome).getOrElse("") + "/bin/hadoop"
+
+    if (hadoop == "/bin/hadoop") {
+      return Json.arr()
+    }
+
+    val listCmd = Seq(hadoop, "job", "-list")
+
+    var outputLines = (listCmd.!!).split('\n')
+
+    Logger.info(outputLines.toString())
+
+    //Get Jobs
+    def getJobs(output: String): String = {
+      var reg = """(job\S+)""".r
+
+      val job: String = reg findFirstIn output match {
+        case Some(reg(s)) => s
+        case None => ""
+      }
+
+      if (job == "jobs") {
+        return ""
+      }
+
+      return job
+    }
+
+    val jobs = (outputLines map getJobs).filter(x => x != "")
+
+    val statusCmd = jobs map {
+      job => (job, Seq(hadoop, "job", "-status", job))
+    }
+
+    def getJobStatus(cmd: Tuple2[String, Seq[String]]): JsArray = {
+      Logger.info(cmd._2.toString())
+      var out = cmd._2.!!
+      Logger.info(out)
+
+      val mapreg = """map() completion: ([0-9]*\.[0-9]+)""".r
+      val redreg = """reduce() completion: ([0-9]*\.[0-9]+)""".r
+
+      val mapComp: String = mapreg findFirstIn out match {
+        case Some(mapreg(s)) => s
+        case None => "0.000"
+      }
+      val redComp: String = redreg findFirstIn out match {
+        case Some(redreg(s)) => s
+        case None => "0.000"
+      }
+
+      if (mapComp == "0.000" && redComp == "0.000") {
+        return Json.arr()
+      }
+
+      val mapName: String = cmd._1 + "_map"
+      val redName: String = cmd._1 + "_reduce"
+
+      return Json.arr(
+        Json.obj("name" -> mapName, "value" -> mapComp.toDouble),
+        Json.obj("name" -> redName, "value" -> redComp.toDouble))
+    }
+
+    val status = statusCmd map getJobStatus
+
+    if (status.isEmpty) {
+      return Json.arr()
+    }
+
+    return status reduce (_ ++ _)
+  }
+
+  /**
+   * Get The different Job statuses currently running
+   * Structure:
+   *   [
+   *     {name: "jobName1", value: 0.1234},
+   *     {name: "jobName2", value: 0.5678},
+   *     ...
+   *   ]
+   */
+  def getJobs: JsArray = {
+    var jobs = Json.arr()
+
+    if ((config.settingsHadoopHome).getOrElse("") != "") { // If not equal to default value
+      jobs = jobs ++ getHadoopJobs
+    }
+
+    return jobs
+  }
+
   /**
    * Get RAM usage in percent
    */
@@ -149,8 +243,9 @@ trait StatsMonitor {
     val ram = getRam
     val cpu = getCpu
     val disk = getDisk
+    val jobs = getJobs
 
-    Ok(Json.obj("ram" -> ram, "cpu" -> cpu, "disk" -> disk))
+    Ok(Json.obj("ram" -> ram, "cpu" -> cpu, "disk" -> disk, "jobs" -> jobs))
   }
 
 }
