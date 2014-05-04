@@ -81,5 +81,4 @@ GET     /engineinfos/:engineinfoid/metricinfos/:metricinfoid/template.html    co
 GET     /engineinfos/:engineinfoid/splitterinfos/:splitterinfoid/template.html    controllers.Application.getSplitterInfoTemplateHtml(engineinfoid: String, splitterinfoid: String)
 
 # Monitor
-GET    /monitor/monitor.html  controllers.MonitorController.Monitor()
 GET    /collector/stats/:numStats            controllers.StatsCollector.getStats(numStats: Int)
