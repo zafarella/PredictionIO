@@ -120,7 +120,7 @@
 
 				</div>
         <div class="modal-header">
-          <h5>System Monitor</h5><i class="icon-refresh" id="refreshMonitor"></i>
+          <h5>System Monitor</h5>
         <div>
         <div class="modal-container">
           <section class="modal-content">
@@ -412,9 +412,6 @@
   function refresh() {
     var stats = $.getJSON('../collector/stats/1000', showGraphs);
   }
-  $("#refreshMonitor").click(function() {
-    refresh();
-  });
   var refreshInterval = setInterval(refresh(), 30000);
 %>
 </script>
