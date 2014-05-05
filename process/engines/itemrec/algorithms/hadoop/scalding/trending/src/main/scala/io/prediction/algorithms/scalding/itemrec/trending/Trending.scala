@@ -19,7 +19,11 @@ import cascading.pipe.Pipe
  * --engineid: <int>
  * --algoid: <int>
  *
- * --numRecommendations: <int>. number of recommendations to be generated
+ * --filter: <boolean> whether or not to filter the data
+ * --filterType: <string> the type of filter to use on the timeseries
+ * --forecastModel: <string> the type of forecasting model to use
+ * --numForecasts: <int> the number of forecasting points to produce
+ * --scoreType: <string> the type of scoring we should use
  *
  * Optional args:
  * --evalid: <int>. Offline Evaluation if evalid is specified
@@ -36,12 +40,15 @@ class Trending(args: Args) extends Job(args) {
   val algoidArg = args("algoid").toInt
   val evalidArg = args.optional("evalid") map (x => x.toInt)
 
-  val numRecommendationsArg = args("numRecommendations").toInt
-  val filterArg = args("filter").toBoolean
-  val filterTypeArg = args("filterType")
-  val forecastTypeArg = args("forecastType")
+  val filterArg = args.getOrElse("filter", "false").toBoolean
+  val filterTypeArg = args.getOrElse("filterType", "nofilter")
+  val forecastModelArg = args("forecastModel")
   val numForecastsArg = args("numForecasts").toInt
   val scoreTypeArg = args("scoreType")
+  val alpha = args.getOrElse("alpha", "0.5").toDouble
+  val beta = args.getOrElse("beta", "0.5").toDouble
+  val gamma = args.getOrElse("gamma", "0.5").toDouble
+  val period = args("period").toInt
 
   val ratingsRaw = Tsv(DataFile(hdfsRootArg, appidArg, engineidArg, algoidArg, evalidArg, "ratings.tsv")).read
   val itemRecScores = Tsv(AlgoFile(hdfsRootArg, appidArg, engineidArg, algoidArg, evalidArg, "itemRecScores.tsv"))
@@ -64,11 +71,7 @@ class Trending(args: Args) extends Job(args) {
       }
 
       // make forcasts
-      val alpha = 0.5 // TODO what are we going to do for these?
-      val gamma = 0.5
-      val beta = 0.5
-      val period = 10
-      val forecastModel = forecastTypeArg match {
+      val forecastModel = forecastModelArg match {
         case "doubleExponential" => new DoubleExponentialModel(alpha, gamma)
         case "tripleExponential" => new HoltWintersModel(alpha, beta, gamma, period)
       }

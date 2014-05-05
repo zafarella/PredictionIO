@@ -84,11 +84,9 @@ class ModelConstructor(args: Args) extends Job(args) {
    * process & output
    */
   val p = scores.joinWithSmaller('iid -> 'iidx, items) // get items info for each iid
-    // .groupAll { _.sortBy('score).reverse.toList[(String, Double, List[String])](('iid, 'score, 'itypes) -> 'iidsList) }
     .joinWithLarger('itemKey -> 'userKey, usersWithKey)
     .project('uid, 'iid, 'score, 'itypes)
-    // .groupBy('uid) { _.sortedReverseTake[(Double, String)](('score, 'iid) -> 'pscore, numRecommendationsArg).toList[(String, Double, List[String])](('iid, 'score, 'itypes) -> 'iidsList) }
-    .groupBy('uid) { _.sortBy('score).reverse.take(numRecommendationsArg) }
+    .groupBy('uid) { _.sortBy('score).reverse.take(numRecommendationsArg) } // take a number of them, we can't call toList yet
     .groupBy('uid) { _.sortBy('score).reverse.toList[(String, Double, List[String])](('iid, 'score, 'itypes) -> 'iidsList) }
 
   val src = ItemRecScores(dbType = dbTypeArg, dbName = dbNameArg, dbHost = dbHostArg, dbPort = dbPortArg, algoid = algoidArg, modelset = modelSetArg)

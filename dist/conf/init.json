@@ -5453,17 +5453,29 @@
             "description": "Predict trending items using basic time series analysis.",
             "batchcommands": [
                 "$hadoop$ jar $base$/lib/$pdioItemrecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.DataPreparator --hdfs --dbType $appdataDbType$ --dbName $appdataDbName$ --dbHost $appdataDbHost$ --dbPort $appdataDbPort$ --hdfsRoot $hdfsRoot$ --appid $appid$ --engineid $engineid$ --algoid $algoid$ $itypes$ --endTime $endTime$ --windowSize $windowSize$ --numWindows $numWindows$ --action $action$",
+                // TODO HERE
+                "$hadoop$ jar $base$/bin/$pdioItemRecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.Trending --hdfs --appid $appid$ --engineid $engineid$ --algoid $algoid$ --filter $filter$ --filterType $filterType$ --forecastModel $forecastModel$ --numForecasts $numForecasts$ --scoreType $scoreType$ --alpha $alpha$ --beta $beta$ --gamma $gamma$ --period $period$",
                 "$hadoop$ jar $base$/lib/$pdioItemrecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.ModelConstructor --hdfs --dbType $modeldataDbType$ --dbName $modeldataDbName$ --dbHost $modeldataDbHost$ --dbPort $modeldataDbPort$ --hdfsRoot $hdfsRoot$ --appid $appid$ --engineid $engineid$ --algoid $algoid$ --modelSet $modelset$ --unseenOnly $unseenOnly$ --numRecommendations $numRecommendations$"
             ],
             "offlineevalcommands": [
-                "$hadoop$ jar $base$/lib/$pdioItemrecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.DataPreparator --hdfs --dbType $appdataDbType$ --dbName $appdataDbName$ --dbHost $appdataDbHost$ --dbPort $appdataDbPort$ --hdfsRoot $hdfsRoot$ --appid $appid$ --engineid $engineid$ --algoid $algoid$ $itypes$ --endTime $endTime$ --windowSize $windowSize$ --numWindows $numWindows$ --action $action$",
-                "$hadoop$ jar $base$/lib/$pdioItemrecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.ModelConstructor --hdfs --dbType $modeldataDbType$ --dbName $modeldataDbName$ --dbHost $modeldataDbHost$ --dbPort $modeldataDbPort$ --hdfsRoot $hdfsRoot$ --appid $appid$ --engineid $engineid$ --algoid $algoid$ --modelSet $modelset$ --unseenOnly $unseenOnly$ --numRecommendations $numRecommendations$"
+                "$hadoop$ jar $base$/lib/$pdioItemrecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.DataPreparator --hdfs --dbType $appdataDbType$ --dbName $appdataDbName$ --dbHost $appdataDbHost$ --dbPort $appdataDbPort$ --hdfsRoot $hdfsRoot$ --appid $appid$ --engineid $engineid$ --algoid $algoid$ --evalid $evalid$ $itypes$ --endTime $endTime$ --windowSize $windowSize$ --numWindows $numWindows$ --action $action$",
+                "$hadoop$ jar $base$/bin/$pdioItemRecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.Trending --hdfs --appid $appid$ --engineid $engineid$ --algoid $algoid$ --evalid $evalid$ --filter $filter$ --filterType $filterType$ --forecastModel $forecastModel$ --numForecasts $numForecasts$ --scoreType $scoreType$ --alpha $alpha$ --beta $beta$ --gamma $gamma$ --period $period$",
+                "$hadoop$ jar $base$/lib/$pdioItemrecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.ModelConstructor --hdfs --dbType $modeldataDbType$ --dbName $modeldataDbName$ --dbHost $modeldataDbHost$ --dbPort $modeldataDbPort$ --hdfsRoot $hdfsRoot$ --appid $appid$ --engineid $engineid$ --algoid $algoid$ --evalid $evalid$ --modelSet $modelset$ --unseenOnly $unseenOnly$ --numRecommendations $numRecommendations$"
             ],
             "paramorder": [
                 "endTime",
                 "windowSize",
                 "numWindows",
-                "action"
+                "action",
+                "filter",
+                "filterType",
+                "forecastType",
+                "numForecasts",
+                "scoreType",
+                "alpha",
+                "beta",
+                "gamma",
+                "period"
             ],
             "engineinfoid": "itemrec",
             "techreq": [
@@ -5556,6 +5568,146 @@
                         ]
                     },
                     "defaultvalue": "view"
+                },
+                "filter": {
+                    "name": "Filter Data?",
+                    "description": "Whether or not to filter (smooth) the timeseries.",
+                    "constraint": {
+                        "paramtype": "boolean"
+                    },
+                    "ui": {
+                        "uitype": "selection",
+                        "selections": [
+                            {
+                                "name": "True",
+                                "value": "true"
+                            },
+                            {
+                                "name": "False",
+                                "value": "false"
+                            }
+                        ]
+                    },
+                    "defaultvalue": "false"
+                },
+                "filterType": {
+                    "name": "Filter Type",
+                    "description": "The type of filter to use to filter the timeseries.",
+                    "constraint": {
+                        "paramtype": "string"
+                    },
+                    "ui": {
+                        "uitype": "selection",
+                        "selections": [
+                            {
+                                "name": "Moving Average",
+                                "value": "movingAverage"
+                            },
+                            {
+                                "name": "Savitzky-Golay",
+                                "value": "savitzkyGolay"
+                            }
+                        ]
+                    },
+                    "defaultvalue": "movingAverage"
+                },
+                "forecastModel": {
+                    "name": "Forecasting Model",
+                    "description": "The forecasting model to use on the timeseries.",
+                    "constraint": {
+                        "paramtype": "string"
+                    },
+                    "ui": {
+                        "uitype": "selection",
+                        "selections": [
+                            {
+                                "name": "Double Exponential Model",
+                                "value": "doubleExponential"
+                            },
+                            {
+                                "name": "Triple Exponential Model (better for things with periodic trends)",
+                                "value": "tripleExponential"
+                            }
+                        ]
+                    },
+                    "defaultvalue": "doubleExponential"
+                },
+                "numForecasts": {
+                    "name": "Number of Forecasting Points",
+                    "description": "The number of future points to forecast.",
+                    "constraint": {
+                        "paramtype": "integer"
+                    },
+                    "ui": {
+                        "uitype": "text"
+                    },
+                    "defaultvalue": "10"
+                },
+                "scoreType": {
+                    "name": "Item Score Type",
+                    "description": "The type of value to assign to each item's score.",
+                    "constraint": {
+                        "paramtype": "string"
+                    },
+                    "ui": {
+                        "uitype": "selection",
+                        "selections": [
+                            {
+                                "name": "Velocity",
+                                "value": "velocity"
+                            },
+                            {
+                                "name": "Accelerations",
+                                "value": "acceleration"
+                            }
+                        ]
+                    },
+                    "defaultvalue": "velocity"
+                },
+                "alpha": {
+                    "name": "Alpha",
+                    "description": "",
+                    "constraint": {
+                        "paramtype": "double"
+                    },
+                    "ui": {
+                        "uitype": "text"
+                    },
+                    "defaultvalue": "0.5"
+                },
+                "beta": {
+                    "name": "Beta",
+                    "description": "",
+                    "constraint": {
+                        "paramtype": "double"
+                    },
+                    "ui": {
+                        "uitype": "text"
+                    },
+                    "defaultvalue": "0.5"
+                },
+                "gamma": {
+                    "name": "Gamma",
+                    "description": "",
+                    "constraint": {
+                        "paramtype": "double"
+                    },
+                    "ui": {
+                        "uitype": "text"
+                    },
+                    "defaultvalue": "0.5"
+                },
+                "period": {
+                    "name": "Period",
+                    "description": "",
+                    "constraint": {
+                        "paramtype": "integer"
+                    },
+                    "ui": {
+                        "uitype": "text"
+                    },
+                    "defaultvalue": ""
+
                 }
             },
             "paramsections": [
