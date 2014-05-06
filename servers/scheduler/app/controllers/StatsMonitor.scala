@@ -20,7 +20,6 @@ trait StatsMonitor {
   val cpu = new ProcCpu
   val dir = new DirUsage
 
-  val pids = getPIDs
   var config = new Config()
 
   val hosts = Seq(
@@ -34,6 +33,10 @@ trait StatsMonitor {
 
   val hostCmds = hosts map {
     host => Seq("mongo", host, "--eval", "printjson(db.stats())")
+  }
+
+  def getHostCmds: Seq[Seq[String]] = {
+    return hostCmds
   }
 
   def getPIDs: Array[Long] = {
@@ -55,31 +58,50 @@ trait StatsMonitor {
     return pids
   }
 
+  // Wrapper function to get RAM Usage for a given PID
+  def getRam(pid: Long): Long = {
+    mem.gather(sigar, pid)
+    return mem.getResident;
+  }
+
+  // Returns the total RAM used by the different processes
+  // in MegaBytes
   def getRam: Double = {
     var total = 0.0
 
-    for (pid <- pids) {
-      mem.gather(sigar, pid)
-      total += mem.getResident;
+    for (pid <- getPIDs) {
+      total += getRam(pid)
     }
 
     return total / 1048576
   }
 
+  // Wrapper function to get CPU Usage for a given PID
+  def getCpu(pid: Long): Double = {
+    cpu.gather(sigar, pid)
+    return cpu.getPercent()
+  }
+
+  // Returns the total CPU Usage for the different processes
   def getCpu: Double = {
     var total = 0.0
 
-    for (pid <- pids) {
-      cpu.gather(sigar, pid)
-      total += cpu.getPercent()
+    for (pid <- getPIDs) {
+      total += getCpu(pid)
     }
 
     return total
   }
 
+  // Wrapper function to Execute command
+  def execute(cmd: Seq[String]): String = {
+    return cmd.!!
+  }
+
+  // Accesses the MongoDB Command line to retrieve disk usage
   def getMongoDisk: Double = {
     def getFileSize(hostCmd: Seq[String]) = {
-      val output = hostCmd.!!
+      val output = execute(hostCmd)
 
       val reg = """"fileSize\" : (\d+),""".r
       val size: String = reg findFirstIn output match {
@@ -89,13 +111,19 @@ trait StatsMonitor {
 
       size.toDouble
     }
-    val fileSizes = hostCmds map getFileSize
+    val fileSizes = getHostCmds map getFileSize
 
     return fileSizes reduce (_ + _)
   }
 
+  // Wrapper function to get disk usage of a given path
+  def getDisk(path: String): Long = {
+    dir.gather(sigar, path)
+    return dir.getDiskUsage()
+  }
+
   /**
-   * Get total Disk Space used
+   * Get total Disk Space used in MegaBytes
    */
   def getDisk: Double = {
     if (config == null) {
@@ -106,8 +134,7 @@ trait StatsMonitor {
     //HDFS Disk Usage
     var hdfsDir = config.settingsHdfsRoot
     try {
-      dir.gather(sigar, hdfsDir)
-      total += dir.getDiskUsage()
+      total += getDisk(hdfsDir)
     } catch {
       case e: Exception => Logger.warn("Could not get HDFS Directory at " + hdfsDir)
     }
@@ -120,6 +147,10 @@ trait StatsMonitor {
     return total / 1048576
   }
 
+  /**
+   * getHadoopJobs accesses the command line for hadoop
+   * and retrieved the job completion of the different map/reduce tasks
+   */
   def getHadoopJobs: JsArray = {
     val hadoop = (config.settingsHadoopHome).getOrElse("") + "/bin/hadoop"
 
@@ -129,7 +160,7 @@ trait StatsMonitor {
 
     val listCmd = Seq(hadoop, "job", "-list")
 
-    var outputLines = (listCmd.!!).split('\n')
+    var outputLines = (execute(listCmd)).split('\n')
 
     Logger.info(outputLines.toString())
 
@@ -157,7 +188,7 @@ trait StatsMonitor {
 
     def getJobStatus(cmd: Tuple2[String, Seq[String]]): JsArray = {
       Logger.info(cmd._2.toString())
-      var out = cmd._2.!!
+      var out = execute(cmd._2)
       Logger.info(out)
 
       val mapreg = """map() completion: ([0-9]*\.[0-9]+)""".r
@@ -201,6 +232,7 @@ trait StatsMonitor {
    *     {name: "jobName2", value: 0.5678},
    *     ...
    *   ]
+   * value should be [0, 1] and represent the percentage of the task done
    */
   def getJobs: JsArray = {
     var jobs = Json.arr()
@@ -239,6 +271,18 @@ trait StatsMonitor {
     Ok(Json.obj("disk" -> (total)))
   }
 
+  /**
+   * Get the statuses of different jobs running
+   */
+  def getJobUsage() = Action {
+    val jobs = getJobs
+
+    Ok(Json.obj("jobs" -> jobs))
+  }
+
+  /**
+   * Get an aggragate Json object of the different stats
+   */
   def getStats() = Action {
     val ram = getRam
     val cpu = getCpu
