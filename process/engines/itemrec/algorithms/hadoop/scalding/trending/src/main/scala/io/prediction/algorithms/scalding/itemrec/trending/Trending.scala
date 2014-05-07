@@ -22,7 +22,6 @@ import cascading.pipe.Pipe
  * --filter: <boolean> whether or not to filter the data
  * --filterType: <string> the type of filter to use on the timeseries
  * --forecastModel: <string> the type of forecasting model to use
- * --numForecasts: <int> the number of forecasting points to produce
  * --scoreType: <string> the type of scoring we should use
  *
  * Optional args:
@@ -43,12 +42,19 @@ class Trending(args: Args) extends Job(args) {
   val filterArg = args.getOrElse("filter", "false").toBoolean
   val filterTypeArg = args.getOrElse("filterType", "nofilter")
   val forecastModelArg = args("forecastModel")
-  val numForecastsArg = args("numForecasts").toInt
   val scoreTypeArg = args("scoreType")
-  val alpha = args.getOrElse("alpha", "0.5").toDouble
-  val beta = args.getOrElse("beta", "0.5").toDouble
-  val gamma = args.getOrElse("gamma", "0.5").toDouble
-  val period = args("period").toInt
+  val windowSizeArg = args("windowSize")
+
+  val alpha = 0.5
+  val beta = 0.5
+  val gamma = 0.5
+  val period = windowSizeArg match {
+    case "hour" => 24
+    case "day" => 7
+    case "week" => 4
+    case _ => -1
+  }
+  val numForecasts = period
 
   val ratingsRaw = Tsv(DataFile(hdfsRootArg, appidArg, engineidArg, algoidArg, evalidArg, "ratings.tsv")).read
   val itemRecScores = Tsv(AlgoFile(hdfsRootArg, appidArg, engineidArg, algoidArg, evalidArg, "itemRecScores.tsv"))
@@ -75,7 +81,7 @@ class Trending(args: Args) extends Job(args) {
         case "doubleExponential" => new DoubleExponentialModel(alpha, gamma)
         case "tripleExponential" => new HoltWintersModel(alpha, beta, gamma, period)
       }
-      val forecasts = forecastModel.forecast(filtered, numForecastsArg)
+      val forecasts = forecastModel.forecast(filtered, numForecasts)
 
       // now score the data
       val degree = scoreTypeArg match {

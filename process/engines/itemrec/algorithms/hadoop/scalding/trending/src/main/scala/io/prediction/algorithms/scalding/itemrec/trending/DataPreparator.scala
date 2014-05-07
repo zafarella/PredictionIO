@@ -27,8 +27,7 @@ import io.prediction.commons.filepath._
  * --dbHost: <string> (eg. "127.0.0.1")
  * --dbPort: <int> (eg. 27017)
  * --endTime: <long>
- * --windowSize: <long>
- * --numWindows: <int>
+ * --windowSize: <string>
  * --action: <string>
  *
  * --itypes: <string separated by white space>. eg "--itypes type1 type2". If no --itypes specified, then ALL itypes will be used.
@@ -56,26 +55,24 @@ class DataPreparator(args: Args) extends Job(args) {
   val preItypesArg = args.list("itypes")
   val itypesArg: Option[List[String]] = if (preItypesArg.mkString(",").length == 0) None else Option(preItypesArg)
 
-  // Default argument values
-  val defaultStart = System.currentTimeMillis / 1000
-  val defaultWindowSize = 1
-  val defaultNumWindows = 20
-  val defaultAction = "view"
-
-  val endTimeArg = args.getOrElse("endTime", defaultStart.toString).toLong
-  val windowSizeArg = args.getOrElse("windowSize", defaultWindowSize.toString).toLong
-  val numWindowsArg = args.getOrElse("numWindows", defaultNumWindows.toString).toInt
-  val actionArg = args.getOrElse("action", defaultAction.toString)
+  val endTimeArg = args("endTime").toLong
+  val windowSizeArg = args("windowSize")
+  val actionArg = args("action")
 
   // the number of seconds in each of the following
-  // val windowSize = windowSizeArg match {
-  //   case "hour" => 3600
-  //   case "day" => 86400
-  //   case "week" => 604800
-  //   case "year" => 31536000
-  //   case _ => -1
-  // }
-  val startTime = endTimeArg - windowSizeArg * numWindowsArg
+  val windowSize = windowSizeArg match {
+    case "hour" => 3600
+    case "day" => 86400
+    case "week" => 604800
+    case _ => -1
+  }
+  val numWindows = windowSizeArg match {
+    case "hour" => 24 * 3
+    case "day" => 7 * 3
+    case "week" => 4 * 3
+    case _ => -1
+  }
+  val startTime = endTimeArg - windowSize * numWindows
 
   /**
    * source
@@ -106,9 +103,9 @@ class DataPreparator(args: Args) extends Job(args) {
       action == actionArg && t.toLong >= startTime && t.toLong < endTimeArg
     }
     .groupBy('iid) {
-      _.foldLeft('t -> 'timeseries)(Array.fill[Int](numWindowsArg)(0)) {
+      _.foldLeft('t -> 'timeseries)(Array.fill[Int](numWindows)(0)) {
         (seriesSoFar: Array[Int], t: String) =>
-          seriesSoFar(((t.toLong - startTime) / windowSizeArg).toInt) += 1
+          seriesSoFar(((t.toLong - startTime) / windowSize).toInt) += 1
           seriesSoFar
       }
     }
