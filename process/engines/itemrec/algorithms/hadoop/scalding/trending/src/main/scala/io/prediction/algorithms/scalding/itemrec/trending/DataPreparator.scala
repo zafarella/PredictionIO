@@ -1,5 +1,6 @@
 package io.prediction.algorithms.scalding.itemrec.trending
 
+import com.github.nscala_time.time.Imports._
 import com.twitter.scalding._
 
 import io.prediction.commons.scalding.appdata.{ Items, U2iActions }
@@ -55,7 +56,7 @@ class DataPreparator(args: Args) extends Job(args) {
   val preItypesArg = args.list("itypes")
   val itypesArg: Option[List[String]] = if (preItypesArg.mkString(",").length == 0) None else Option(preItypesArg)
 
-  val endTimeArg = args("endTime").toLong
+  val now = DateTime.now.millis
   val windowSizeArg = args("windowSize")
   val actionArg = args("action")
 
@@ -68,11 +69,11 @@ class DataPreparator(args: Args) extends Job(args) {
   }
   val numWindows = windowSizeArg match {
     case "hour" => 24 * 3
-    case "day" => 7 * 3
-    case "week" => 4 * 3
+    case "day" => 7 * 4
+    case "week" => 4 * 5
     case _ => -1
   }
-  val startTime = endTimeArg - windowSize * numWindows
+  val startTime = now - windowSize * numWindows
 
   /**
    * source
@@ -100,7 +101,7 @@ class DataPreparator(args: Args) extends Job(args) {
   u2i.joinWithSmaller('iid -> 'iidx, items)
     .filter('action, 't) { fields: (String, String) =>
       val (action, t) = fields
-      action == actionArg && t.toLong >= startTime && t.toLong < endTimeArg
+      action == actionArg && t.toLong >= startTime && t.toLong < now
     }
     .groupBy('iid) {
       _.foldLeft('t -> 'timeseries)(Array.fill[Int](numWindows)(0)) {
