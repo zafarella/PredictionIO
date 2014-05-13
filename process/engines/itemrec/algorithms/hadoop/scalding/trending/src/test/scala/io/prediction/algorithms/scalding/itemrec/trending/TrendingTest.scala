@@ -10,21 +10,21 @@ class TrendingTest extends Specification with TupleConversions {
 
   // helper function
   // only compare double up to 9 decimal places
-  def roundingData(orgList: List[(String, String, Double)]) = {
+  def roundingData(orgList: List[(String, Double)]) = {
     orgList map { x =>
-      val (t1, t2, t3) = x
+      val (t1, t2) = x
 
       // NOTE: use HALF_UP mode to avoid error caused by rounding when compare data
       // (eg. 3.5 vs 3.499999999999).
       // (eg. 0.6666666666 vs 0.666666667)
 
-      (t1, t2, BigDecimal(t3).setScale(9, BigDecimal.RoundingMode.HALF_UP).toDouble)
+      (t1, BigDecimal(t2).setScale(9, BigDecimal.RoundingMode.HALF_UP).toDouble)
     }
   }
 
   def test(testArgs: Map[String, String],
-    testInput: List[(String, String, Int)],
-    testOutput: List[(String, String, Double)]) = {
+    testInput: List[(String, String)],
+    testOutput: List[(String, Double)]) = {
 
     val appid = 1
     val engineid = 2
@@ -42,7 +42,7 @@ class TrendingTest extends Specification with TupleConversions {
       .arg("scoreType", testArgs("scoreType"))
       .arg("windowSize", testArgs("windowSize"))
       .source(Tsv(DataFile(hdfsRoot, appid, engineid, algoid, None, "ratings.tsv")), testInput)
-      .sink[(String, String, Double)](Tsv(AlgoFile(hdfsRoot, appid, engineid, algoid, None, "itemRecScores.tsv"))) { outputBuffer =>
+      .sink[(String, Double)](Tsv(AlgoFile(hdfsRoot, appid, engineid, algoid, None, "itemRecScores.tsv"))) { outputBuffer =>
         "correctly calculate itemRecScores" in {
           roundingData(outputBuffer.toList) must containTheSameElementsAs(roundingData(testOutput))
         }
@@ -60,50 +60,36 @@ class TrendingTest extends Specification with TupleConversions {
   )
 
   val test1Input = List(
-    ("u0", "i0", 1),
-    ("u0", "i1", 2),
-    ("u0", "i2", 3),
-    ("u1", "i1", 4),
-    ("u1", "i2", 4),
-    ("u1", "i3", 2),
-    ("u2", "i0", 3),
-    ("u2", "i1", 2),
-    ("u2", "i3", 1),
-    ("u3", "i0", 2),
-    ("u3", "i2", 1),
-    ("u3", "i3", 5))
+    ("i0", "1,1"),
+    ("i1", "2,1"),
+    ("i2", "3,1"),
+    ("i1", "4,1"),
+    ("i2", "4,1"),
+    ("i3", "2,1"),
+    ("i0", "3,1"),
+    ("i1", "2,1"),
+    ("i3", "1,1"),
+    ("i0", "2,1"),
+    ("i2", "1,1"),
+    ("i3", "5,1"))
 
-  val test1ItemSimScore = List(
-    ("i0", "i1", 0.0),
-    ("i1", "i0", 0.0),
-    ("i0", "i2", -0.16666666666666666),
-    ("i2", "i0", -0.16666666666666666),
-    ("i0", "i3", -0.16666666666666666),
-    ("i3", "i0", -0.16666666666666666),
-    ("i1", "i2", 0.16666666666666666),
-    ("i2", "i1", 0.16666666666666666),
-    ("i1", "i3", 0.16666666666666666),
-    ("i3", "i1", 0.16666666666666666),
-    ("i2", "i3", -0.16666666666666666),
-    ("i3", "i2", -0.16666666666666666))
-
-  val test1Output = List[(String, String, Double)](
-    ("u0", "i0", 1),
-    ("u0", "i1", 2),
-    ("u0", "i2", 3),
-    ("u0", "i3", -0.666666666666667),
-    ("u1", "i0", -3.0),
-    ("u1", "i1", 4),
-    ("u1", "i2", 4),
-    ("u1", "i3", 2),
-    ("u2", "i0", 3),
-    ("u2", "i1", 2),
-    ("u2", "i2", -0.666666666666667),
-    ("u2", "i3", 1),
-    ("u3", "i0", 2),
-    ("u3", "i1", 3.0),
-    ("u3", "i2", 1),
-    ("u3", "i3", 5))
+  val test1Output = List[(String, Double)](
+    ("i0", 1),
+    ("i1", 2),
+    ("i2", 3),
+    ("i3", -0.666666666666667),
+    ("i0", -3.0),
+    ("i1", 4),
+    ("i2", 4),
+    ("i3", 2),
+    ("i0", 3),
+    ("i1", 2),
+    ("i2", -0.666666666666667),
+    ("i3", 1),
+    ("i0", 2),
+    ("i1", 3.0),
+    ("i2", 1),
+    ("i3", 5))
 
   "Trending" should {
     test(test1args, test1Input, test1Output)
