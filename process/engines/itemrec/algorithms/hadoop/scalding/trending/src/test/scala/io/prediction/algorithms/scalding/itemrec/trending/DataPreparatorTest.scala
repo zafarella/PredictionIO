@@ -43,8 +43,8 @@ class DataPreparatorTest extends Specification with TupleConversions {
       .arg("itypes", itypes)
       .arg("action", params("action"))
       .arg("endTime", params("endTime"))
-      .arg("windowSize", params("windowSize"))
       .arg("numWindows", params("numWindows"))
+      .arg("windowSizeExplicit", params("windowSizeExplicit"))
       //.arg("debug", List("test")) // NOTE: test mode
       .source(Items(appId = appid, itypes = Some(itypes), dbType = dbType, dbName = dbName, dbHost = dbHost, dbPort = dbPort).getSource, items)
       .source(U2iActions(appId = appid, dbType = dbType, dbName = dbName, dbHost = dbHost, dbPort = dbPort).getSource, u2iActions)
@@ -86,8 +86,8 @@ class DataPreparatorTest extends Specification with TupleConversions {
       .arg("algoid", algoid.toString)
       .arg("action", params("action"))
       .arg("endTime", params("endTime"))
-      .arg("windowSize", params("windowSize"))
       .arg("numWindows", params("numWindows"))
+      .arg("windowSizeExplicit", params("windowSizeExplicit"))
       //.arg("debug", List("test")) // NOTE: test mode
       .source(Items(appId = appid, itypes = None, dbType = dbType, dbName = dbName, dbHost = dbHost, dbPort = dbPort).getSource, items)
       .source(U2iActions(appId = appid, dbType = dbType, dbName = dbName, dbHost = dbHost, dbPort = dbPort).getSource, u2iActions)
@@ -137,7 +137,7 @@ class DataPreparatorTest extends Specification with TupleConversions {
   val test1Params: Map[String, String] = Map(
     "action" -> view,
     "endTime" -> "3",
-    "windowSize" -> "1",
+    "windowSizeExplicit" -> "1",
     "numWindows" -> "3")
 
   "itemrec.trending DataPreparator with only view actions, all itypes" should {
@@ -180,7 +180,7 @@ class DataPreparatorTest extends Specification with TupleConversions {
   val test2Params: Map[String, String] = Map(
     "action" -> view,
     "endTime" -> "3",
-    "windowSize" -> "1",
+    "windowSizeExplicit" -> "1",
     "numWindows" -> "3")
 
   "itemrec.trending DataPreparator with many actions, looking for views, all itypes" should {
@@ -217,7 +217,7 @@ class DataPreparatorTest extends Specification with TupleConversions {
   val test3Params: Map[String, String] = Map(
     "action" -> view,
     "endTime" -> "3",
-    "windowSize" -> "1",
+    "windowSizeExplicit" -> "1",
     "numWindows" -> "3")
   val test3SelectedItems = List(
     ("i0", "t1,t2,t3"),

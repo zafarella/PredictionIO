@@ -23,13 +23,15 @@ import io.prediction.commons.filepath._
  * --appid: <int>
  * --engineid: <int>
  * --algoid: <int>
+ * --windowSize: <string>
+ * --action: <string>
  *
  * Optional args:
  * --dbHost: <string> (eg. "127.0.0.1")
  * --dbPort: <int> (eg. 27017)
- * --endTime: <long>
- * --windowSize: <string>
- * --action: <string>
+ * --endTime: <long> (by default now)
+ * --numWindows: <int>
+ * --windowSizeExplicit: <int>
  *
  * --itypes: <string separated by white space>. eg "--itypes type1 type2". If no --itypes specified, then ALL itypes will be used.
  * --evalid: <int>. Offline Evaluation if evalid is specified
@@ -57,23 +59,29 @@ class DataPreparator(args: Args) extends Job(args) {
   val itypesArg: Option[List[String]] = if (preItypesArg.mkString(",").length == 0) None else Option(preItypesArg)
 
   val now = DateTime.now.millis
-  val windowSizeArg = args("windowSize")
+  val windowSizeArg = args.getOrElse("windowSize", "nosize") // the only time this shouldn't be supplied is during testing
   val actionArg = args("action")
+  val endTimeArg = args.getOrElse("endTime", now.toString).toLong // input values should only be used for testing
+  val numWindowsArg = args.getOrElse("numWindows", "-1").toInt // should only be used for testing
 
   // the number of seconds in each of the following
   val windowSize = windowSizeArg match {
     case "hour" => 3600
     case "day" => 86400
     case "week" => 604800
-    case _ => -1
+    case _ => args.getOrElse("windowSizeExplicit", "-1").toInt
   }
-  val numWindows = windowSizeArg match {
-    case "hour" => 24 * 3
-    case "day" => 7 * 4
-    case "week" => 4 * 5
-    case _ => -1
+  var numWindows = numWindowsArg
+  if (numWindows <= 0) {
+    numWindows = windowSizeArg match {
+      case "hour" => 24 * 3
+      case "day" => 7 * 4
+      case "week" => 4 * 5
+      case _ => -1
+    }
   }
-  val startTime = now - windowSize * numWindows
+
+  val startTime = endTimeArg - windowSize * numWindows
 
   /**
    * source
@@ -101,7 +109,7 @@ class DataPreparator(args: Args) extends Job(args) {
   u2i.joinWithSmaller('iid -> 'iidx, items)
     .filter('action, 't) { fields: (String, String) =>
       val (action, t) = fields
-      action == actionArg && t.toLong >= startTime && t.toLong < now
+      action == actionArg && t.toLong >= startTime && t.toLong < endTimeArg
     }
     .groupBy('iid) {
       _.foldLeft('t -> 'timeseries)(Array.fill[Int](numWindows)(0)) {
