@@ -36,7 +36,11 @@ class TrendingTest extends Specification with TupleConversions {
       .arg("engineid", engineid.toString)
       .arg("algoid", algoid.toString)
       .arg("hdfsRoot", hdfsRoot)
-      .arg("numRecommendations", testArgs("numRecommendations"))
+      .arg("filter", testArgs("filter"))
+      .arg("filterType", testArgs("filterType"))
+      .arg("forecastModel", testArgs("forecastModel"))
+      .arg("scoreType", testArgs("scoreType"))
+      .arg("windowSize", testArgs("windowSize"))
       .source(Tsv(DataFile(hdfsRoot, appid, engineid, algoid, None, "ratings.tsv")), testInput)
       .sink[(String, String, Double)](Tsv(AlgoFile(hdfsRoot, appid, engineid, algoid, None, "itemRecScores.tsv"))) { outputBuffer =>
         "correctly calculate itemRecScores" in {
@@ -48,7 +52,11 @@ class TrendingTest extends Specification with TupleConversions {
   }
 
   // test1
-  val test1args = Map[String, String]("numRecommendations" -> "500"
+  val test1args = Map[String, String]("filter" -> "false",
+    "filterType" -> "nofilter",
+    "forecastModel" -> "doubleExponential",
+    "scoreType" -> "velocity",
+    "windowSize" -> "hour"
   )
 
   val test1Input = List(
@@ -98,7 +106,7 @@ class TrendingTest extends Specification with TupleConversions {
     ("u3", "i3", 5))
 
   "Trending" should {
-    testWithMerge(test1args, test1Input, test1Output)
+    test(test1args, test1Input, test1Output)
   }
 
 }

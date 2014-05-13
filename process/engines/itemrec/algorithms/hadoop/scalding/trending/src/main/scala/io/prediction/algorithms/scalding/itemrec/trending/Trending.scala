@@ -93,7 +93,7 @@ class Trending(args: Args) extends Job(args) {
       score -= polyModel.getCoefficients(filtered)(degree)
       Math.abs(score)
   }
-    .project('iid, 'score)
-    .write(itemRecScores)
+  .project('iid, 'score)
+  .write(itemRecScores)
 
 }
