@@ -90,7 +90,6 @@ class Trending(args: Args) extends Job(args) {
       }
       var polyModel = new PolynomialModel(degree)
       var score = polyModel.getCoefficients(forecasts)(degree)
-      score -= polyModel.getCoefficients(filtered)(degree)
       Math.abs(score)
   }
     .project('iid, 'score)
