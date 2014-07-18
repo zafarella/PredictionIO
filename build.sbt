@@ -1,6 +1,6 @@
 name := "predictionio"
 
-version in ThisBuild := "0.7.0-SNAPSHOT"
+version in ThisBuild := "0.6.7"
 
 organization in ThisBuild := "io.prediction"
 
@@ -115,13 +115,15 @@ lazy val processEnginesItemRecAlgoHadoopScalding = project
     processEnginesItemRecAlgoHadoopScaldingKnnitembased,
     processEnginesItemRecAlgoHadoopScaldingRandomrank,
     processEnginesItemRecAlgoHadoopScaldingLatestrank,
-    processEnginesItemRecAlgoHadoopScaldingMahout)
+    processEnginesItemRecAlgoHadoopScaldingMahout,
+    processEnginesItemRecAlgoHadoopScaldingTrending)
   .dependsOn(
     processEnginesItemRecAlgoHadoopScaldingGeneric,
     processEnginesItemRecAlgoHadoopScaldingKnnitembased,
     processEnginesItemRecAlgoHadoopScaldingRandomrank,
     processEnginesItemRecAlgoHadoopScaldingLatestrank,
-    processEnginesItemRecAlgoHadoopScaldingMahout)
+    processEnginesItemRecAlgoHadoopScaldingMahout,
+    processEnginesItemRecAlgoHadoopScaldingTrending)
 
 lazy val processEnginesItemRecAlgoHadoopScaldingGeneric = project
   .in(file("process/engines/itemrec/algorithms/hadoop/scalding/generic"))
@@ -137,6 +139,11 @@ lazy val processEnginesItemRecAlgoHadoopScaldingRandomrank = project
   .in(file("process/engines/itemrec/algorithms/hadoop/scalding/randomrank"))
   .dependsOn(processCommonsHadoopScalding)
   .settings(scalariformSettings: _*)
+
+lazy val processEnginesItemRecAlgoHadoopScaldingTrending = project
+ .in(file("process/engines/itemrec/algorithms/hadoop/scalding/trending"))
+ .dependsOn(processCommonsHadoopScalding)
+ .settings(scalariformSettings: _*)
 
 lazy val processEnginesItemRecAlgoHadoopScaldingLatestrank = project
   .in(file("process/engines/itemrec/algorithms/hadoop/scalding/latestrank"))

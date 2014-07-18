@@ -3,7 +3,7 @@ package io.prediction.algorithms.scalding.itemrec.generic
 import com.twitter.scalding._
 
 import io.prediction.commons.scalding.appdata.{ Items, U2iActions }
-import io.prediction.commons.filepath.DataFile
+import io.prediction.commons.filepath._
 
 /**
  * Source: appdata DB (items, u2iActions)

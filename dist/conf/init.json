@@ -1,20 +1,20 @@
 {
     "systeminfos": {
         "version": {
-            "value": "0.7.0-SNAPSHOT",
+            "value": "0.6.7",
             "description": "PredictionIO version"
         },
         "jars.pdioItemrecAlgo": {
-            "value": "predictionio-process-hadoop-scalding-assembly-0.7.0-SNAPSHOT.jar"
+            "value": "predictionio-process-hadoop-scalding-assembly-0.6.7.jar"
         },
         "jars.pdioItemsimAlgo": {
-            "value": "predictionio-process-hadoop-scalding-assembly-0.7.0-SNAPSHOT.jar"
+            "value": "predictionio-process-hadoop-scalding-assembly-0.6.7.jar"
         },
         "jars.pdioItemrecEval": {
-            "value": "predictionio-process-hadoop-scalding-assembly-0.7.0-SNAPSHOT.jar"
+            "value": "predictionio-process-hadoop-scalding-assembly-0.6.7.jar"
         },
         "jars.pdioItemsimEval": {
-            "value": "predictionio-process-hadoop-scalding-assembly-0.7.0-SNAPSHOT.jar"
+            "value": "predictionio-process-hadoop-scalding-assembly-0.6.7.jar"
         },
         "jars.pdioCommonsEval": {
             "value": "predictionio-process-hadoop-scalding-assembly-0.7.0-SNAPSHOT.jar"
@@ -5442,6 +5442,209 @@
                             "description": "When there are conflicting actions, e.g. a user gives an item a rating 5 but later dislikes it, determine which action will be considered as final preference.",
                             "params": [
                                 "conflictParam"
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "pio-itemrec-distributed-trending": {
+            "name": "Trending Recommender",
+            "description": "Predict trending items using basic time series analysis.",
+            "batchcommands": [
+                "$hadoop$ jar $base$/lib/$pdioItemrecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.DataPreparator --hdfs --dbType $appdataDbType$ --dbName $appdataDbName$ --dbHost $appdataDbHost$ --dbPort $appdataDbPort$ --hdfsRoot $hdfsRoot$ --appid $appid$ --engineid $engineid$ --algoid $algoid$ $itypes$ --windowSize $windowSize$ --action $action$",
+                "$hadoop$ jar $base$/bin/$pdioItemRecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.Trending --hdfs --appid $appid$ --engineid $engineid$ --algoid $algoid$ --filter $filter$ --filterType $filterType$ --forecastModel $forecastModel$ --scoreType $scoreType$ --windowSize $windowSize$",
+                "$hadoop$ jar $base$/lib/$pdioItemrecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.ModelConstructor --hdfs --dbType $modeldataDbType$ --dbName $modeldataDbName$ --dbHost $modeldataDbHost$ --dbPort $modeldataDbPort$ --hdfsRoot $hdfsRoot$ --appid $appid$ --engineid $engineid$ --algoid $algoid$ --modelSet $modelset$ --unseenOnly $unseenOnly$ --numRecommendations $numRecommendations$"
+            ],
+            "offlineevalcommands": [
+                "$hadoop$ jar $base$/lib/$pdioItemrecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.DataPreparator --hdfs --dbType $appdataDbType$ --dbName $appdataDbName$ --dbHost $appdataDbHost$ --dbPort $appdataDbPort$ --hdfsRoot $hdfsRoot$ --appid $appid$ --engineid $engineid$ --algoid $algoid$ --evalid $evalid$ $itypes$ --windowSize $windowSize$ --action $action$",
+                "$hadoop$ jar $base$/bin/$pdioItemRecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.Trending --hdfs --appid $appid$ --engineid $engineid$ --algoid $algoid$ --evalid $evalid$ --filter $filter$ --filterType $filterType$ --forecastModel $forecastModel$ --scoreType $scoreType$ --windowSize $windowSize$",
+                "$hadoop$ jar $base$/lib/$pdioItemrecAlgo$ io.prediction.algorithms.scalding.itemrec.trending.ModelConstructor --hdfs --dbType $modeldataDbType$ --dbName $modeldataDbName$ --dbHost $modeldataDbHost$ --dbPort $modeldataDbPort$ --hdfsRoot $hdfsRoot$ --appid $appid$ --engineid $engineid$ --algoid $algoid$ --evalid $evalid$ --modelSet $modelset$ --unseenOnly $unseenOnly$ --numRecommendations $numRecommendations$"
+            ],
+            "paramorder": [
+                "windowSize",
+                "action",
+                "filter",
+                "filterType",
+                "forecastType",
+                "scoreType"
+            ],
+            "engineinfoid": "itemrec",
+            "techreq": [
+                "Hadoop"
+            ],
+            "datareq": [
+                "Users, Items, and U2I Actions such as Like, Conversion and Rate."
+            ],
+            "params": {
+                "windowSize": {
+                    "name": "Window Size",
+                    "description": "",
+                    "constraint": {
+                        "paramtype": "integer"
+                    },
+                    "ui" {
+                        "uitype": "selection",
+                        "selections": [
+                            {
+                                "name": "Hour",
+                                "value": "hour"
+                            },
+                            {
+                                "name": "Day",
+                                "value": "day"
+                            },
+                            {
+                                "name": "Week",
+                                "value": "week"
+                            }
+                        ]
+                    },
+                    "defaultvalue": "day"
+                },
+                "action": {
+                    "name": "Trending Action",
+                    "description": "The type of action to look at.",
+                    "constraint": {
+                        "paramtype": "string"
+                    },
+                    "ui": {
+                        "uitype": "selection",
+                        "selections": [
+                            {
+                                "name": "Rate",
+                                "value": "rate"
+                            },
+                            {
+                                "name": "Like",
+                                "value": "like"
+                            },
+                            {
+                                "name": "Dislike",
+                                "value": "dislike"
+                            },
+                            {
+                                "name": "View",
+                                "value": "view"
+                            },
+                            {
+                                "name": "View Details",
+                                "value": "viewDetails"
+                            },
+                            {
+                                "name": "Conversion",
+                                "value": "conversion"
+                            }
+                        ]
+                    },
+                    "defaultvalue": "view"
+                },
+                "filter": {
+                    "name": "Filter Data?",
+                    "description": "Whether or not to filter (smooth) the timeseries.",
+                    "constraint": {
+                        "paramtype": "boolean"
+                    },
+                    "ui": {
+                        "uitype": "selection",
+                        "selections": [
+                            {
+                                "name": "True",
+                                "value": "true"
+                            },
+                            {
+                                "name": "False",
+                                "value": "false"
+                            }
+                        ]
+                    },
+                    "defaultvalue": "false"
+                },
+                "filterType": {
+                    "name": "Filter Type",
+                    "description": "The type of filter to use to filter the timeseries.",
+                    "constraint": {
+                        "paramtype": "string"
+                    },
+                    "ui": {
+                        "uitype": "selection",
+                        "selections": [
+                            {
+                                "name": "Moving Average",
+                                "value": "movingAverage"
+                            },
+                            {
+                                "name": "Savitzky-Golay",
+                                "value": "savitzkyGolay"
+                            }
+                        ]
+                    },
+                    "defaultvalue": "movingAverage"
+                },
+                "forecastModel": {
+                    "name": "Forecasting Model",
+                    "description": "The forecasting model to use on the timeseries.",
+                    "constraint": {
+                        "paramtype": "string"
+                    },
+                    "ui": {
+                        "uitype": "selection",
+                        "selections": [
+                            {
+                                "name": "Double Exponential Model",
+                                "value": "doubleExponential"
+                            },
+                            {
+                                "name": "Triple Exponential Model (better for things with periodic trends)",
+                                "value": "tripleExponential"
+                            }
+                        ]
+                    },
+                    "defaultvalue": "doubleExponential"
+                },
+                "scoreType": {
+                    "name": "Item Score Type",
+                    "description": "The type of value to assign to each item's score.",
+                    "constraint": {
+                        "paramtype": "string"
+                    },
+                    "ui": {
+                        "uitype": "selection",
+                        "selections": [
+                            {
+                                "name": "Velocity",
+                                "value": "velocity"
+                            },
+                            {
+                                "name": "Accelerations",
+                                "value": "acceleration"
+                            }
+                        ]
+                    },
+                    "defaultvalue": "velocity"
+                }
+            },
+            "paramsections": [
+                {
+                    "name": "Parameter Settings",
+                    "sectiontype": "normal",
+                    "subsections": [
+                        {
+                            "name": "Time Series Settings",
+                            "sectiontype": "normal",
+                            "params": [
+                                "action",
+                                "windowSize"
+                            ]
+                        },
+                        {
+                            "name": "Prediction Settings",
+                            "sectiontype": "normal",
+                            "params": [
+                                "filter",
+                                "filterType",
+                                "forecastType",
+                                "scoreType"
                             ]
                         }
                     ]
