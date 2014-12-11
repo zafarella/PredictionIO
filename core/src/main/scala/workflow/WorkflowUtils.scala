@@ -200,6 +200,36 @@ object WorkflowUtils extends Logging {
     rootLogger.addAppender(appender)
     if (debug) rootLogger.setLevel(Level.DEBUG)
   }
+
+  def sparkArg(args: Seq[String], arg: String): Option[String] = {
+    val index = args.indexOf(arg)
+    if (index != -1) Some(args(index + 1)) else None
+  }
+
+  def driverInCluster(args: Seq[String]): Boolean = {
+    val master = sparkArg(args, "--master")
+    val deployMode = sparkArg(args, "--deploy-mode")
+    val deployInCluster = deployMode map {
+      case "cluster" => true
+      case _ => false
+    } getOrElse false
+    master map {
+      case s if s.startsWith("local") => false
+      case "yarn-client" => false
+      case "yarn-cluster" => true
+      case s if s.startsWith("spark") => deployInCluster
+      case s if s.startsWith("mesos") => deployInCluster
+    } getOrElse false
+  }
+
+  def executorInCluster(args: Seq[String]): Boolean = {
+    val master = sparkArg(args, "--master")
+    master map {
+      case s if s.startsWith("spark") => true
+      case s if s.startsWith("mesos") => true
+      case "yarn-cluster" => true
+    } getOrElse false
+  }
 }
 
 class PIOFilter(verbose: Boolean = false, debug: Boolean = false)
