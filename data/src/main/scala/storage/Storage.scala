@@ -53,9 +53,9 @@ object Storage extends Logging {
   private case class ClientMeta(sourceType: String, client: BaseStorageClient)
   private case class DataObjectMeta(sourceName: String, databaseName: String)
 
-  private val s2cm = scala.collection.mutable.Map[String, Option[ClientMeta]]()
+  private val s2cm = scala.collection.mutable.Map[String, Either[String, ClientMeta]]()
   private def updateS2CM(k: String, parallel: Boolean, test: Boolean):
-    Option[ClientMeta] = {
+    Either[String, ClientMeta] = {
     try {
       val keyedPath = sourcesPrefixPath(k)
       val sourceType = sys.env(prefixPath(keyedPath, "TYPE"))
@@ -68,26 +68,26 @@ object Storage extends Logging {
         parallel = parallel,
         test = test)
       val client = getClient(clientConfig, sourceType)
-      Some(ClientMeta(sourceType, client))
+      Right(ClientMeta(sourceType, client))
     } catch {
       case e: Throwable =>
         error(s"Error initializing storage client for source ${k}")
         error(e.getMessage)
         errors += 1
-        None
+        Left(e.getMessage)
     }
   }
   private def sourcesToClientMetaGet(
       source: String,
       parallel: Boolean,
-      test: Boolean): Option[ClientMeta] = {
+      test: Boolean): Either[String, ClientMeta] = {
     s2cm.getOrElseUpdate(source, updateS2CM(source, parallel, test))
   }
   private def sourcesToClientMeta(
       source: String,
       parallel: Boolean,
       test: Boolean): ClientMeta =
-    sourcesToClientMetaGet(source, parallel, test).get
+    sourcesToClientMetaGet(source, parallel, test).right.get
 
   /*
   if (sys.env.get("PIO_STORAGE_INIT_SOURCES").getOrElse(false)) {
@@ -168,7 +168,8 @@ object Storage extends Logging {
       sourceName: String,
       parallel: Boolean,
       test: Boolean): Option[BaseStorageClient] =
-    sourcesToClientMetaGet(sourceName, parallel, test).map(_.client)
+    sourcesToClientMetaGet(sourceName, parallel, test).right.toOption.map(
+      _.client)
 
   private[prediction]
   def getDataObject[T](repo: String, test: Boolean = false)
@@ -190,7 +191,10 @@ object Storage extends Logging {
       databaseName: String,
       parallel: Boolean = false,
       test: Boolean = false)(implicit tag: TypeTag[T]): T = {
-    val clientMeta = sourcesToClientMeta(sourceName, parallel, test)
+    val clientMetaEither = sourcesToClientMetaGet(sourceName, parallel, test)
+    val clientMeta = clientMetaEither.right.getOrElse(
+      throw new StorageClientException(clientMetaEither.left.get)
+    )
     val sourceType = clientMeta.sourceType
     val ctorArgs = dataObjectCtorArgs(clientMeta.client, databaseName)
     val classPrefix = clientMeta.client.prefix
@@ -234,17 +238,18 @@ object Storage extends Logging {
     Seq(client.client, dbName)
   }
 
-  private[prediction] def verifyAllDataObjects(): Unit = {
-    println("  Verifying Meta Data Backend")
+  private[prediction]
+  def verifyAllDataObjects(verbose: Boolean = true): Unit = {
+    if (verbose) println("  Verifying Meta Data Backend")
     getMetaDataEngineManifests()
     getMetaDataEngineInstances()
     getMetaDataApps()
     getMetaDataAccessKeys()
-    println("  Verifying Model Data Backend")
+    if (verbose) println("  Verifying Model Data Backend")
     getModelDataModels()
-    println("  Verifying Event Data Backend")
+    if (verbose) println("  Verifying Event Data Backend")
     val eventsDb = getLEvents(test = true)
-    println("  Test write Event Store (App Id 0)")
+    if (verbose) println("  Test write Event Store (App Id 0)")
     // use appId=0 for testing purpose
     eventsDb.init(0)
     eventsDb.insert(Event(

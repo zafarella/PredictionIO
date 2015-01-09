@@ -81,7 +81,8 @@ case class CommonArgs(
   stopAfterPrepare: Boolean = false,
   skipSanityCheck: Boolean = false,
   verbose: Boolean = false,
-  debug: Boolean = false)
+  debug: Boolean = false,
+  json: Boolean = false)
 
 case class BuildArgs(
   sbt: Option[File] = None,
@@ -170,6 +171,9 @@ object Console extends Logging {
       }
       opt[Unit]("debug") action { (x, c) =>
         c.copy(common = c.common.copy(debug = true))
+      }
+      opt[Unit]("json") action { (x, c) =>
+        c.copy(common = c.common.copy(json = true))
       }
       note("")
       cmd("version").
@@ -1215,19 +1219,44 @@ object Console extends Logging {
   }
 
   def status(ca: ConsoleArgs): Unit = {
-    println("PredictionIO")
+    val pioErrors = collection.mutable.ListBuffer[String]()
+    val pio = collection.mutable.Map[String, Any]("errors" -> pioErrors)
+    val sparkErrors = collection.mutable.ListBuffer[String]()
+    val spark = collection.mutable.Map[String, Any]("errors" -> sparkErrors)
+    val storageErrors = collection.mutable.ListBuffer[String]()
+    val storage = collection.mutable.Map[String, Any]("errors" -> storageErrors)
+    val jsonOutput = collection.mutable.Map[String, Any](
+      "event" -> "client:status",
+      "version" -> BuildInfo.version,
+      "data" -> Map("services" -> Map(
+        "pio" -> pio,
+        "spark" -> spark,
+        "storage" -> storage)))
+    if (!ca.common.json) println("PredictionIO")
     ca.common.pioHome map { pioHome =>
-      println(s"  Installed at: ${pioHome}")
-      println(s"  Version: ${BuildInfo.version}")
+      if (ca.common.json) {
+        pio += ("home" -> pioHome, "version" -> BuildInfo.version)
+      } else {
+        println(s"  Installed at: ${pioHome}")
+        println(s"  Version: ${BuildInfo.version}")
+      }
     } getOrElse {
-      println("Unable to locate PredictionIO installation. Aborting.")
-      sys.exit(1)
+      if (ca.common.json) {
+        pioErrors += "Unable to locate PredictionIO installation."
+      } else {
+        println("Unable to locate PredictionIO installation. Aborting.")
+        sys.exit(1)
+      }
     }
-    println("")
+    if (!ca.common.json) println("")
     val sparkHome = getSparkHome(ca.common.sparkHome)
     if (new File(s"${sparkHome}/bin/spark-submit").exists) {
-      println(s"Apache Spark")
-      println(s"  Installed at: ${sparkHome}")
+      if (ca.common.json) {
+        spark += ("home" -> sparkHome)
+      } else {
+        println(s"Apache Spark")
+        println(s"  Installed at: ${sparkHome}")
+      }
       val sparkMinVersion = "1.2.0"
       val sparkReleaseFile = new File(s"${sparkHome}/RELEASE")
       if (sparkReleaseFile.exists) {
@@ -1237,38 +1266,81 @@ object Console extends Logging {
         val parsedMinVersion = Version.apply(sparkMinVersion)
         val parsedCurrentVersion = Version.apply(sparkReleaseVersion)
         if (parsedCurrentVersion >= parsedMinVersion) {
-          println(s"  Version: ${sparkReleaseVersion} (meets minimum " +
-            s"requirement of ${sparkMinVersion})")
+          if (ca.common.json) {
+            spark += ("version" -> sparkReleaseVersion)
+          } else {
+            println(s"  Version: ${sparkReleaseVersion} (meets minimum " +
+              s"requirement of ${sparkMinVersion})")
+          }
         } else {
-          println("  Version: ${sparkReleaseVersion}")
-          println("Apache Spark version does not meet minimum requirement. " +
-            "Aborting.")
+          if (ca.common.json) {
+            sparkErrors += s"${sparkReleaseVersion} does not meet " +
+              "minimum requirement."
+          } else {
+            println("  Version: ${sparkReleaseVersion}")
+            println("Apache Spark version does not meet minimum requirement. " +
+              "Aborting.")
+          }
         }
       } else {
-        println("  Version information cannot be found.")
-        println("  If you are using a developmental tree, please make sure")
-        println("  you are using a version of at least ${sparkMinVersion}.")
+        if (ca.common.json) {
+          sparkErrors += "Version information cannot be found. If " +
+            "you are using a developmental tree, please make sure you are " +
+            "using a version of at least ${sparkMinVersion}."
+        } else {
+          println("  Version information cannot be found.")
+          println("  If you are using a developmental tree, please make sure")
+          println("  you are using a version of at least ${sparkMinVersion}.")
+        }
       }
     } else {
-      println("Unable to locate a proper Apache Spark installation. Aborting.")
-      sys.exit(1)
+      if (ca.common.json) {
+        sparkErrors += "Unable to locate a proper Apache Spark " +
+          "installation."
+      } else {
+        println("Unable to locate a proper Apache Spark installation. Aborting.")
+        sys.exit(1)
+      }
     }
-    println("")
-    println("Storage Backend Connections")
+    if (!ca.common.json) {
+      println("")
+      println("Storage Backend Connections")
+    }
     try {
-      Storage.verifyAllDataObjects()
+      Storage.verifyAllDataObjects(!ca.common.json)
     } catch {
       case e: Throwable =>
-        e.printStackTrace
-        println("")
-        println("Unable to connect to all storage backend(s) successfully. " +
-          "Please refer to error message(s) above. Aborting.")
-        sys.exit(1)
+        if (ca.common.json) {
+          val c = Option(e.getCause()).map(x => x).getOrElse(e)
+          val errorOrigin = c.getStackTrace()(0)
+          storageErrors += "Unable to connect to all storage backend(s) " +
+            s"successfully: ${errorOrigin.getClassName}: " +
+            c.getMessage()
+        } else {
+          if (ca.common.verbose || Option(e.getCause()) == None) {
+            e.printStackTrace
+          } else {
+            println(e.getCause().getStackTrace()(0).getClassName + ": " +
+              e.getCause().getMessage())
+          }
+          println("")
+          println("Unable to connect to all storage backend(s) successfully. " +
+            "Please refer to error message(s) above. Aborting.")
+          sys.exit(1)
+        }
     }
-    println("")
-    println("(sleeping 5 seconds for all messages to show up...)")
-    Thread.sleep(5000)
-    println("Your system is all ready to go.")
+    if (ca.common.json) {
+      pio("success") = (if (pioErrors.size > 0) false else true)
+      spark("success") = (if (sparkErrors.size > 0) false else true)
+      storage("success") = (if (storageErrors.size > 0) false else true)
+      implicit val formats = Utils.json4sDefaultFormats
+      println(write(jsonOutput))
+    } else {
+      println("")
+      println("(sleeping 5 seconds for all messages to show up...)")
+      Thread.sleep(5000)
+      println("Your system is all ready to go.")
+    }
   }
 
   def upgrade(ca: ConsoleArgs): Unit = {
