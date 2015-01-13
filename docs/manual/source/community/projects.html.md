@@ -23,9 +23,9 @@ to the community! Simply:
 
 ## Vagrant Installation for PredictionIO
 
-URL: https://github.com/magento-hackathon/PredictionIO-Vagrant
+URL: https://github.com/PredictionIO/PredictionIO-Vagrant
 
-Bring Up PredictionIO 0.8.0 VM with Vagrant.
+Bring Up PredictionIO 0.8.6-SNAPSHOT VM with Vagrant.
 
 - Core Author: Raphael Mäder
 
@@ -67,4 +67,3 @@ based on the PredictionIO Java SDK API.
 - Core Author: Themos Piperakis
 
 - Status: It works with PredictionIO v0.8 - Under active development
-

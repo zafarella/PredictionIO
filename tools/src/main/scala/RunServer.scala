@@ -29,7 +29,7 @@ object RunServer extends Logging {
       ca: ConsoleArgs,
       core: File,
       em: EngineManifest,
-      engineInstanceId: String): Unit = {
+      engineInstanceId: String): Int = {
     val pioEnvVars = sys.env.filter(kv => kv._1.startsWith("PIO_")).map(kv =>
       s"${kv._1}=${kv._2}"
     ).mkString(",")
@@ -49,6 +49,27 @@ object RunServer extends Logging {
     val extraClasspaths =
       driverClassPathPrefix ++ WorkflowUtils.thirdPartyClasspaths
 
+    val deployModeIndex =
+      ca.common.sparkPassThrough.indexOf("--deploy-mode")
+    val deployMode = if (deployModeIndex != -1)
+      ca.common.sparkPassThrough(deployModeIndex + 1)
+    else
+      "client"
+
+    val mainJar =
+      if (ca.build.uberJar) {
+        if (deployMode == "cluster")
+          em.files.filter(_.startsWith("hdfs")).head
+        else
+          em.files.filterNot(_.startsWith("hdfs")).head
+      } else {
+        if (deployMode == "cluster") {
+          em.files.filter(_.contains("pio-assembly")).head
+        } else {
+          core.getCanonicalPath
+        }
+      }
+
     val sparkSubmit =
       Seq(Seq(sparkHome, "bin", "spark-submit").mkString(File.separator)) ++
       ca.common.sparkPassThrough ++
@@ -56,10 +77,13 @@ object RunServer extends Logging {
         "--class",
         "io.prediction.workflow.CreateServer",
         "--name",
-        s"PredictionIO Engine Instance: ${engineInstanceId}",
-        "--jars",
-        (em.files ++ Console.builtinEngines(
-          ca.common.pioHome.get).map(_.getCanonicalPath)).mkString(",")) ++
+        s"PredictionIO Engine Instance: ${engineInstanceId}") ++
+      (if (!ca.build.uberJar) {
+        Seq(
+          "--jars",
+          (em.files ++ Console.builtinEngines(
+            ca.common.pioHome.get).map(_.getCanonicalPath)).mkString(","))
+      } else Seq()) ++
       (if (extraFiles.size > 0)
         Seq("--files", extraFiles.mkString(","))
       else
@@ -69,13 +93,13 @@ object RunServer extends Logging {
       else
         Seq()) ++
       Seq(
-        core.getCanonicalPath,
+        mainJar,
         "--engineInstanceId",
         engineInstanceId,
         "--ip",
-        ca.ip,
+        ca.deploy.ip,
         "--port",
-        ca.port.toString,
+        ca.deploy.port.toString,
         "--event-server-ip",
         ca.eventServer.ip,
         "--event-server-port",
@@ -83,8 +107,11 @@ object RunServer extends Logging {
       (if (ca.accessKey.accessKey != "")
         Seq("--accesskey", ca.accessKey.accessKey) else Seq()) ++
       (if (ca.eventServer.enabled) Seq("--feedback") else Seq()) ++
+      (if (ca.batch != "") Seq("--batch", ca.batch) else Seq()) ++
       (if (ca.common.verbose) Seq("--verbose") else Seq()) ++
-      (if (ca.common.debug) Seq("--debug") else Seq())
+      (if (ca.common.debug) Seq("--debug") else Seq()) ++
+      ca.deploy.logUrl.map(x => Seq("--log-url", x)).getOrElse(Seq()) ++
+      ca.deploy.logPrefix.map(x => Seq("--log-prefix", x)).getOrElse(Seq())
 
     info(s"Submission command: ${sparkSubmit.mkString(" ")}")
 

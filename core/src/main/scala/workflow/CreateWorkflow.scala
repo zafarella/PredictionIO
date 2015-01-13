@@ -46,7 +46,8 @@ import java.io.File
 object CreateWorkflow extends Logging {
 
   case class WorkflowConfig(
-    batch: String = "Transient Lazy Val",
+    deployMode: String = "",
+    batch: String = "",
     engineId: String = "",
     engineVersion: String = "",
     engineVariant: String = "",
@@ -61,6 +62,7 @@ object CreateWorkflow extends Logging {
     skipSanityCheck: Boolean = false,
     stopAfterRead: Boolean = false,
     stopAfterPrepare: Boolean = false,
+    verbosity: Int = 0,
     verbose: Boolean = false,
     debug: Boolean = false)
 
@@ -183,11 +185,18 @@ object CreateWorkflow extends Logging {
       opt[Unit]("stop-after-prepare") action { (x, c) =>
         c.copy(stopAfterPrepare = true)
       }
+      opt[String]("deploy-mode") action { (x, c) =>
+        c.copy(deployMode = x)
+      }
+      opt[Int]("verbosity") action { (x, c) =>
+        c.copy(verbosity = x)
+      }
     }
 
     parser.parse(args, WorkflowConfig()) map { wfc =>
       WorkflowUtils.setupLogging(wfc.verbose, wfc.debug)
-      val variantJson = parse(stringFromFile("", wfc.engineVariant, localfs))
+      val targetfs = if (wfc.deployMode == "cluster") hdfs else localfs
+      val variantJson = parse(stringFromFile("", wfc.engineVariant, targetfs))
       val engineFactory = variantJson \ "engineFactory" match {
         case JString(s) => s
         case _ =>
@@ -415,7 +424,7 @@ object CreateWorkflow extends Logging {
         engineVariant = variantId,
         engineFactory = engineFactory,
         evaluatorClass = wfc.evaluatorClass.getOrElse(""),
-        batch = wfc.batch,
+        batch = (if (wfc.batch == "") engineFactory else wfc.batch),
         env = pioEnvVars,
         dataSourceParams = write(dataSourceParams),
         preparatorParams = write(preparatorParams),
@@ -431,8 +440,8 @@ object CreateWorkflow extends Logging {
       CoreWorkflow.runEngineTypeless(
         env = pioEnvVars,
         params = WorkflowParams(
-          verbose = 3,
-          batch = wfc.batch,
+          verbose = wfc.verbosity,
+          batch = (if (wfc.batch == "") engineFactory else wfc.batch),
           skipSanityCheck = wfc.skipSanityCheck,
           stopAfterRead = wfc.stopAfterRead,
           stopAfterPrepare = wfc.stopAfterPrepare),
