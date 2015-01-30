@@ -68,7 +68,6 @@ class Engine[TD, EI, PD, Q, P, A](
     * @param preparatorClass Preparator class.
     * @param algorithmClassMap Map of algorithm names to classes.
     * @param servingClass Serving class.
-    * @group Engine
     */
   def this(
     dataSourceClass: Class[_ <: BaseDataSource[TD, EI, Q, A]],
@@ -244,6 +243,9 @@ class SimpleEngineParams(
 trait IEngineFactory {
   /** Creates an instance of an [[Engine]]. */
   def apply(): Engine[_, _, _, _, _, _]
+
+  /** Override this method to programatically return engine parameters. */
+  def engineParams(key: String): EngineParams = EngineParams()
 }
 
 /** Mix in this trait for queries that contain prId (PredictedResultId).
