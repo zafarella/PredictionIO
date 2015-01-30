@@ -94,7 +94,7 @@ object Agent extends Logging {
       }
     }
 
-    val secret = sys.env.get("PIO_AGENT_SECRETKEY").getOrElse {
+    val secret = sys.env.get("PIO_AGENT_SECRET_KEY").getOrElse {
       ca.common.agentSecret.getOrElse {
         error("Secret key not found from configuration file nor command line. Aborting.")
         return 1
