@@ -801,7 +801,8 @@ object Console extends Logging {
     "accesskey" -> console.txt.accesskey().toString,
     "run" -> console.txt.run().toString,
     "eval" -> console.txt.eval().toString,
-    "dashboard" -> console.txt.dashboard().toString)
+    "dashboard" -> console.txt.dashboard().toString,
+    "agent" -> console.txt.agent().toString)
 
   def createProject(ca: ConsoleArgs): Unit = {
     val scalaEngineTemplate = Map(

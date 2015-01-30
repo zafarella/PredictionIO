@@ -1,0 +1,10 @@
+Usage: pio agent [--url <value>] [--hostname <value>] [--secret <value>]
+
+Launches an agent.
+
+  --url <value>
+      URL of the agent's API endpoint.
+  --hostname <value>
+      Hostname to be sent to the API endpoint.
+  --secret <value>
+      API endpoint secret key.
