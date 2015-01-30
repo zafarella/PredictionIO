@@ -7,6 +7,8 @@ import io.prediction.tools.ConsoleArgs
 import grizzled.slf4j.Logging
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
+import org.json4s.JString
+import org.json4s.JValue
 import org.json4s.JsonDSL._
 import org.json4s.native.JsonMethods._
 
@@ -42,12 +44,8 @@ class AgentWebSocketClient(uri: URI, pioHome: String)
         info(status)
         send(status)
       case (Some("client:ping"), Some("get")) =>
-        val json =
-          ("event" -> "client:status") ~
-          ("action" -> "set") ~
-          ("version" -> BuildInfo.version) ~
-          ("data" -> "pong")
-        send(compact(render(json)))
+        send(compact(render(Agent.createFrame(
+          "client:ping", "set", JString("pong")))))
       case _ =>
         error(s"Unknown message received: ${event} ${action}")
     }
@@ -63,17 +61,18 @@ class AgentWebSocketClient(uri: URI, pioHome: String)
 }
 
 object Agent extends Logging {
+  def createFrame(event: String, action: String, data: JValue): JValue =
+    ("event" -> event) ~
+    ("action" -> action) ~
+    ("version" -> BuildInfo.version) ~
+    ("data" -> data)
+
   def pioStatus(piohome: String) = {
     val status =
       Process(s"${piohome}/bin/pio status --json").lines_!.toList.last
     try {
       val statusJson = parse(status)
-      val json =
-        ("event" -> "client:status") ~
-        ("action" -> "set") ~
-        ("version" -> BuildInfo.version) ~
-        ("data" -> statusJson)
-      compact(render(json))
+      compact(render(createFrame("client:status", "set", statusJson)))
     } catch {
       case e: Throwable => e.getMessage
     }
@@ -82,27 +81,31 @@ object Agent extends Logging {
   def start(ca: ConsoleArgs): Int = {
     val url = sys.env.get("PIO_AGENT_URL").getOrElse {
       ca.common.agentUrl.getOrElse {
-        error("URL not found from configuration file nor command line. Aborting.")
+        error("URL not found from configuration file nor command line. " +
+          "Aborting.")
         return 1
       }
     }
 
     val hostname = sys.env.get("PIO_AGENT_HOSTNAME").getOrElse {
       ca.common.agentHostname.getOrElse {
-        error("Hostname not found from configuration file nor command line. Aborting.")
+        error("Hostname not found from configuration file nor command line. " +
+          "Aborting.")
         return 1
       }
     }
 
     val secret = sys.env.get("PIO_AGENT_SECRET_KEY").getOrElse {
       ca.common.agentSecret.getOrElse {
-        error("Secret key not found from configuration file nor command line. Aborting.")
+        error("Secret key not found from configuration file nor command line." +
+          " Aborting.")
         return 1
       }
     }
 
     val uri = new URI(
-      s"${url}/api/socket?hostname=${hostname}&secret_key=${secret}")
+      s"${url}/api/socket?hostname=${hostname}&secret_key=${secret}&path=" +
+      ca.common.pioHome.get)
     val agent = new AgentWebSocketClient(uri, ca.common.pioHome.get)
     if (uri.getScheme == "wss") {
       val sslContext = SSLContext.getInstance("TLS")
