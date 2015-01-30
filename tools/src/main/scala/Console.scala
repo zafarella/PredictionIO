@@ -87,9 +87,12 @@ case class CommonArgs(
   verbose: Boolean = false,
   verbosity: Int = 0,
   debug: Boolean = false,
-  json: Boolean = false,
   sparkKryo: Boolean = false,
-  logFile: String = "pio.log")
+  logFile: String = "pio.log",
+  json: Boolean = false,
+  agentUrl: Option[String] = None,
+  agentSecret: Option[String] = None,
+  agentHostname: Option[String] = None)
 
 case class BuildArgs(
   sbt: Option[File] = None,
@@ -651,6 +654,20 @@ object Console extends Logging {
               c.copy(commands = c.commands :+ "list")
             }
         )
+      cmd("agent").
+        action { (_, c) =>
+          c.copy(commands = c.commands :+ "agent")
+        } children(
+          opt[String]("url") action { (x, c) =>
+            c.copy(common = c.common.copy(agentUrl = Some(x)))
+          },
+          opt[String]("secret") action { (x, c) =>
+            c.copy(common = c.common.copy(agentSecret = Some(x)))
+          },
+          opt[String]("hostname") action { (x, c) =>
+            c.copy(common = c.common.copy(agentHostname = Some(x)))
+          }
+        )
     }
 
     val separatorIndex = args.indexWhere(_ == "--")
@@ -743,6 +760,8 @@ object Console extends Logging {
           console.Template.get(ca)
         case Seq("template", "list") =>
           console.Template.list(ca)
+        case Seq("agent") =>
+          agent.Agent.start(ca)
         case _ =>
           System.err.println(help(ca.commands))
           1
@@ -1379,13 +1398,10 @@ object Console extends Logging {
     val storageErrors = collection.mutable.ListBuffer[String]()
     val storage = collection.mutable.Map[String, Any]("errors" -> storageErrors)
     val jsonOutput = collection.mutable.Map[String, Any](
-      "event" -> "client:status",
-      "action" -> "set",
-      "version" -> BuildInfo.version,
-      "data" -> Map("services" -> Map(
+      "services" -> Map(
         "pio" -> pio,
         "spark" -> spark,
-        "storage" -> storage)))
+        "storage" -> storage))
     if (!ca.common.json) println("PredictionIO")
     ca.common.pioHome map { pioHome =>
       if (ca.common.json) {
