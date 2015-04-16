@@ -37,7 +37,7 @@ package io.prediction
   *  1. [[LDataSource]], [[LPreparator]], [[LAlgorithm]], [[LServing]]
   *
   * In both configurations 1 and 2, data is sourced and prepared in a
-  * parallelized fashion, with data type as [[org.apache.spark.rdd.RDD]].
+  * parallelized fashion, with data type as RDD.
   *
   * The difference between configurations 1 and 2 come at the algorithm stage.
   * In configuration 1, the algorithm operates on potentially large data as RDDs
@@ -98,59 +98,61 @@ package io.prediction
   */
 package object controller {
 
+  class SerializableClass() extends Serializable
+
   /** Empty data source parameters.
-    * @group General
+    * @group Helper
     */
   type EmptyDataSourceParams = EmptyParams
 
   /** Empty data parameters.
-    * @group General
+    * @group Helper
     */
   type EmptyDataParams = EmptyParams
   
   /** Empty evaluation info.
-    * @group General
+    * @group Helper
     */
-  type EmptyEvaluationInfo = EmptyParams
+  type EmptyEvaluationInfo = SerializableClass
 
   /** Empty preparator parameters.
-    * @group General
+    * @group Helper
     */
   type EmptyPreparatorParams = EmptyParams
 
   /** Empty algorithm parameters.
-    * @group General
+    * @group Helper
     */
   type EmptyAlgorithmParams = EmptyParams
 
   /** Empty serving parameters.
-    * @group General
+    * @group Helper
     */
   type EmptyServingParams = EmptyParams
 
   /** Empty metrics parameters.
-    * @group General
+    * @group Helper
     */
   type EmptyMetricsParams = EmptyParams
 
   /** Empty training data.
-    * @group General
+    * @group Helper
     */
-  type EmptyTrainingData = AnyRef
+  type EmptyTrainingData = SerializableClass
 
   /** Empty prepared data.
-    * @group General
+    * @group Helper
     */
-  type EmptyPreparedData = AnyRef
+  type EmptyPreparedData = SerializableClass
 
   /** Empty model.
-    * @group General
+    * @group Helper
     */
-  type EmptyModel = AnyRef
+  type EmptyModel = SerializableClass
 
   /** Empty actual result.
-    * @group General
+    * @group Helper
     */
-  type EmptyActualResult = AnyRef
+  type EmptyActualResult = SerializableClass
 
 }

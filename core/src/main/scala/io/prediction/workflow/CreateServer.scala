@@ -19,7 +19,6 @@ import io.prediction.controller.Engine
 import io.prediction.controller.Params
 import io.prediction.controller.Utils
 import io.prediction.controller.WithPrId
-import io.prediction.controller.WorkflowParams
 import io.prediction.core.BaseAlgorithm
 import io.prediction.core.BaseServing
 import io.prediction.core.Doer
@@ -80,10 +79,10 @@ case class ServerConfig(
   engineInstanceId: String = "",
   engineId: Option[String] = None,
   engineVersion: Option[String] = None,
-  ip: String = "localhost",
+  ip: String = "0.0.0.0",
   port: Int = 8000,
   feedback: Boolean = false,
-  eventServerIp: String = "localhost",
+  eventServerIp: String = "0.0.0.0",
   eventServerPort: Int = 7070,
   accessKey: Option[String] = None,
   logUrl: Option[String] = None,
@@ -117,7 +116,7 @@ object CreateServer extends Logging {
       } text("Engine version.")
       opt[String]("ip") action { (x, c) =>
         c.copy(ip = x)
-      } text("IP to bind to (default: localhost).")
+      }
       opt[Int]("port") action { (x, c) =>
         c.copy(port = x)
       } text("Port to bind to (default: 8000).")
@@ -129,7 +128,7 @@ object CreateServer extends Logging {
       } text("Enable feedback loop to event server.")
       opt[String]("event-server-ip") action { (x, c) =>
         c.copy(eventServerIp = x)
-      } text("Event server IP. Default: localhost")
+      }
       opt[Int]("event-server-port") action { (x, c) =>
         c.copy(eventServerPort = x)
       } text("Event server port. Default: 7070")
@@ -495,18 +494,20 @@ class ServerActor[Q, P](
                   }
                 // val genPrId = Random.alphanumeric.take(64).mkString
                 def genPrId: String = Random.alphanumeric.take(64).mkString
-                val newPrId = if (r._2.isInstanceOf[WithPrId]) {
-                  val org = r._2.asInstanceOf[WithPrId].prId
-                  if (org.isEmpty) genPrId else org
-                } else genPrId
+                val newPrId = r._2 match {
+                  case id: WithPrId =>
+                    val org = id.prId
+                    if (org.isEmpty) genPrId else org
+                  case _ => genPrId
+                }
 
                 // also save Query's prId as prId of this pio_pr predict events
                 val queryPrId =
-                  if (r._3.isInstanceOf[WithPrId]) {
-                    Map("prId" ->
-                      r._3.asInstanceOf[WithPrId].prId)
-                  } else {
-                    Map()
+                  r._3 match {
+                    case id: WithPrId =>
+                      Map("prId" -> id.prId)
+                    case _ =>
+                      Map()
                   }
                 val data = Map(
                   // "appId" -> dataSourceParams.asInstanceOf[ParamsWithAppId].appId,
