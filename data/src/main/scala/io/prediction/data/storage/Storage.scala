@@ -17,14 +17,12 @@ package io.prediction.data.storage
 
 import grizzled.slf4j.Logging
 
-import scala.collection.JavaConversions._
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.existentials
 import scala.reflect.runtime.universe._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
 @deprecated("Use StorageException", "0.9.2")
-private[prediction] case class StorageError(val message: String)
+private[prediction] case class StorageError(message: String)
 
 private[prediction] class StorageException(message: String, cause: Throwable)
   extends Exception(message, cause) {
@@ -57,8 +55,11 @@ object Storage extends Logging {
 
   if (sourceKeys.size == 0) warn("There is no properly configured data source.")
 
-  private case class ClientMeta(sourceType: String, client: BaseStorageClient)
-  private case class DataObjectMeta(sourceName: String, databaseName: String)
+  private case class ClientMeta(
+    sourceType: String,
+    client: BaseStorageClient,
+    config: StorageClientConfig)
+  private case class DataObjectMeta(sourceName: String, namespace: String)
 
   private val s2cm = scala.collection.mutable.Map[String, Option[ClientMeta]]()
   private def updateS2CM(k: String, parallel: Boolean, test: Boolean):
@@ -66,23 +67,17 @@ object Storage extends Logging {
     try {
       val keyedPath = sourcesPrefixPath(k)
       val sourceType = sys.env(prefixPath(keyedPath, "TYPE"))
-      // hosts and ports are to be deprecated
-      val hosts = sys.env(prefixPath(keyedPath, "HOSTS")).split(',')
-      val ports = sys.env(prefixPath(keyedPath, "PORTS")).split(',').
-        map(_.toInt)
-      val props = sys.env.filter(t => t._1.startsWith(keyedPath))
+      val props = sys.env.filter(t => t._1.startsWith(keyedPath)).map(
+        t => t._1.replace(s"${keyedPath}_", "") -> t._2)
       val clientConfig = StorageClientConfig(
-        hosts = hosts,
-        ports = ports,
         properties = props,
         parallel = parallel,
         test = test)
       val client = getClient(clientConfig, sourceType)
-      Some(ClientMeta(sourceType, client))
+      Some(ClientMeta(sourceType, client, clientConfig))
     } catch {
       case e: Throwable =>
-        error(s"Error initializing storage client for source ${k}")
-        error(e.getMessage)
+        error(s"Error initializing storage client for source ${k}", e)
         errors += 1
         None
     }
@@ -135,7 +130,7 @@ object Storage extends Logging {
         if (sourceKeys.contains(sourceName)) {
           r -> DataObjectMeta(
             sourceName = sourceName,
-            databaseName = name)
+            namespace = name)
         } else {
           error(s"$sourceName is not a configured storage source.")
           r -> DataObjectMeta("", "")
@@ -170,19 +165,19 @@ object Storage extends Logging {
     (implicit tag: TypeTag[T]): T = {
     val repoDOMeta = repositoriesToDataObjectMeta(repo)
     val repoDOSourceName = repoDOMeta.sourceName
-    getDataObject[T](repoDOSourceName, repoDOMeta.databaseName, test = test)
+    getDataObject[T](repoDOSourceName, repoDOMeta.namespace, test = test)
   }
 
   private[prediction]
   def getPDataObject[T](repo: String)(implicit tag: TypeTag[T]): T = {
     val repoDOMeta = repositoriesToDataObjectMeta(repo)
     val repoDOSourceName = repoDOMeta.sourceName
-    getPDataObject[T](repoDOSourceName, repoDOMeta.databaseName)
+    getPDataObject[T](repoDOSourceName, repoDOMeta.namespace)
   }
 
   private[prediction] def getDataObject[T](
       sourceName: String,
-      databaseName: String,
+      namespace: String,
       parallel: Boolean = false,
       test: Boolean = false)(implicit tag: TypeTag[T]): T = {
     val clientMeta = sourcesToClientMeta(sourceName, parallel, test) getOrElse {
@@ -190,7 +185,7 @@ object Storage extends Logging {
         s"Data source $sourceName was not properly initialized.")
     }
     val sourceType = clientMeta.sourceType
-    val ctorArgs = dataObjectCtorArgs(clientMeta.client, databaseName)
+    val ctorArgs = dataObjectCtorArgs(clientMeta.client, namespace)
     val classPrefix = clientMeta.client.prefix
     val originalClassName = tag.tpe.toString.split('.')
     val rawClassName = sourceType + "." + classPrefix + originalClassName.last
@@ -198,7 +193,15 @@ object Storage extends Logging {
     val clazz = try {
       Class.forName(className)
     } catch {
-      case e: ClassNotFoundException => Class.forName(rawClassName)
+      case e: ClassNotFoundException =>
+        try {
+          Class.forName(rawClassName)
+        } catch {
+          case e: ClassNotFoundException =>
+            throw new StorageClientException("No storage backend " +
+              "implementation can be found (tried both " +
+              s"$className and $rawClassName)")
+        }
     }
     val constructor = clazz.getConstructors()(0)
     try {
@@ -215,7 +218,7 @@ object Storage extends Logging {
           " Number of existing constructor arguments: " +
           constructor.getParameterTypes.size + "." +
           s" Storage source name: ${sourceName}." +
-          s" Exception message: ${e.getMessage}).")
+          s" Exception message: ${e.getMessage}).", e)
         errors += 1
         throw e
       case e: java.lang.reflect.InvocationTargetException =>
@@ -230,8 +233,8 @@ object Storage extends Logging {
 
   private def dataObjectCtorArgs(
       client: BaseStorageClient,
-      dbName: String): Seq[AnyRef] = {
-    Seq(client.client, dbName)
+      namespace: String): Seq[AnyRef] = {
+    Seq(client.client, client.config, namespace)
   }
 
   private[prediction] def verifyAllDataObjects(): Unit = {
@@ -302,8 +305,6 @@ private[prediction] trait BaseStorageClient {
 }
 
 private[prediction] case class StorageClientConfig(
-  hosts: Seq[String] = Seq(), // deprecated
-  ports: Seq[Int] = Seq(), // deprecated
   parallel: Boolean = false, // parallelized access (RDD)?
   test: Boolean = false, // test mode config
   properties: Map[String, String] = Map())
