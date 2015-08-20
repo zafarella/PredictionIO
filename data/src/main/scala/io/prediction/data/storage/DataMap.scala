@@ -19,27 +19,30 @@ import org.json4s._
 import org.json4s.native.JsonMethods.parse
 
 import scala.collection.GenTraversableOnce
+import scala.collection.JavaConversions
 
-/** Exception thrown by DataMap object.
+/** Exception class for [[DataMap]]
+  *
+  * @group Event Data
   */
-private[prediction] case class DataMapException(msg: String, cause: Exception)
+case class DataMapException(msg: String, cause: Exception)
   extends Exception(msg, cause) {
-
   def this(msg: String) = this(msg, null)
 }
 
 /** A DataMap stores properties of the event or entity. Internally it is a Map
   * whose keys are property names and values are corresponding JSON values
-  * respectively. Use the get() method to retrieve the value of mandatory
-  * property or use getOpt() to retrieve the value of the optional property.
+  * respectively. Use the [[get]] method to retrieve the value of a mandatory
+  * property or use [[getOpt]] to retrieve the value of an optional property.
   *
   * @param fields Map of property name to JValue
+  * @group Event Data
   */
 class DataMap (
   val fields: Map[String, JValue]
 ) extends Serializable {
   @transient lazy implicit private val formats = DefaultFormats +
-    new DateTimeJson4sSupport.serializer
+    new DateTimeJson4sSupport.Serializer
 
   /** Check the existence of a required property name. Throw an exception if
     * it does not exist.
@@ -48,7 +51,7 @@ class DataMap (
     */
   def require(name: String): Unit = {
     if (!fields.contains(name)) {
-      throw new DataMapException(s"The field ${name} is required.")
+      throw new DataMapException(s"The field $name is required.")
     }
   }
 
@@ -72,7 +75,7 @@ class DataMap (
     require(name)
     fields(name) match {
       case JNull => throw new DataMapException(
-        s"The required field ${name} cannot be null.")
+        s"The required field $name cannot be null.")
       case x: JValue => x.extract[T]
     }
   }
@@ -99,6 +102,42 @@ class DataMap (
     */
   def getOrElse[T: Manifest](name: String, default: T): T = {
     getOpt[T](name).getOrElse(default)
+  }
+
+  /** Java-friendly method for getting the value of a property. Return null if the
+    * property does not exist.
+    *
+    * @tparam T The type of the property value
+    * @param name The property name
+    * @param clazz The class of the type of the property value
+    * @return Return the property value of type T
+    */
+  def get[T](name: String, clazz: java.lang.Class[T]): T = {
+    val manifest =  new Manifest[T] {
+      override def erasure: Class[_] = clazz
+      override def runtimeClass: Class[_] = clazz
+    }
+
+    fields.get(name) match {
+      case None => null.asInstanceOf[T]
+      case Some(JNull) => null.asInstanceOf[T]
+      case Some(x) => x.extract[T](formats, manifest)
+    }
+  }
+
+  /** Java-friendly method for getting a list of values of a property. Return null if the
+    * property does not exist.
+    *
+    * @param name The property name
+    * @return Return the list of property values
+    */
+  def getStringList(name: String): java.util.List[String] = {
+    fields.get(name) match {
+      case None => null
+      case Some(JNull) => null
+      case Some(x) =>
+        JavaConversions.seqAsJavaList(x.extract[List[String]](formats, manifest[List[String]]))
+    }
   }
 
   /** Return a new DataMap with elements containing elements from the left hand
@@ -151,24 +190,24 @@ class DataMap (
   }
 
   override
-  def toString: String = s"DataMap(${fields})"
+  def toString: String = s"DataMap($fields)"
 
   override
-  def hashCode: Int = (41 + fields.hashCode)
+  def hashCode: Int = 41 + fields.hashCode
 
   override
   def equals(other: Any): Boolean = other match {
-    case that: DataMap => {
-      (that.canEqual(this)) &&
-      (this.fields.equals(that.fields))
-    }
+    case that: DataMap => that.canEqual(this) && this.fields.equals(that.fields)
     case _ => false
   }
 
   def canEqual(other: Any): Boolean = other.isInstanceOf[DataMap]
 }
 
-/** Companion object of the [[DataMap]] class. */
+/** Companion object of the [[DataMap]] class
+  *
+  * @group Event Data
+  */
 object DataMap {
   /** Create an empty DataMap
     * @return an empty DataMap

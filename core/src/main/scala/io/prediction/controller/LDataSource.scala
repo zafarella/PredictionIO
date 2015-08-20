@@ -32,19 +32,16 @@ import scala.reflect._
   * @tparam A Actual value class.
   * @group Data Source
   */
-abstract class LDataSource[TD : ClassTag, EI : ClassTag, Q, A]
+abstract class LDataSource[TD: ClassTag, EI, Q, A]
   extends BaseDataSource[RDD[TD], EI, Q, A] {
 
-  private[prediction]
   def readTrainingBase(sc: SparkContext): RDD[TD] = {
     sc.parallelize(Seq(None)).map(_ => readTraining())
   }
 
-  /** Implement this method to only return training data from a data source.
-    */
+  /** Implement this method to only return training data from a data source */
   def readTraining(): TD
 
-  private[prediction]
   def readEvalBase(sc: SparkContext): Seq[(RDD[TD], EI, RDD[(Q, A)])] = {
     val localEvalData: Seq[(TD, EI, Seq[(Q, A)])] = readEval()
 

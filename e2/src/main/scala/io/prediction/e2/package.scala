@@ -15,8 +15,8 @@
 
 package io.prediction.e2
 
-/** Collection of engine and evaluation libraries that have no dependency on
-  * PredictionIO.
-  */
+/** Collection of engine libraries that have no dependency on PredictionIO */
 package object engine {}
+
+/** Collection of evaluation libraries that have no dependency on PredictionIO */
 package object evaluation {}

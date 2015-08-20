@@ -15,15 +15,14 @@
 
 package io.prediction.controller
 
+import _root_.io.prediction.controller.java.SerializableComparator
 import io.prediction.core.BaseEngine
 import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
 import org.apache.spark.rdd.RDD
-
-import scala.reflect._
-
-import Numeric.Implicits._   
 import org.apache.spark.util.StatCounter
+
+import scala.Numeric.Implicits._
+import scala.reflect._
 
 /** Base class of a [[Metric]].
   *
@@ -36,6 +35,15 @@ import org.apache.spark.util.StatCounter
   */
 abstract class Metric[EI, Q, P, A, R](implicit rOrder: Ordering[R])
 extends Serializable {
+  /** Java friendly constructor
+    *
+    * @param comparator A serializable comparator for sorting the metric results.
+    *
+    */
+  def this(comparator: SerializableComparator[R]) = {
+    this()(Ordering.comparatorToOrdering(comparator))
+  }
+
   /** Class name of this [[Metric]]. */
   def header: String = this.getClass.getSimpleName
 
@@ -125,10 +133,10 @@ abstract class OptionAverageMetric[EI, Q, P, A]
   }
 }
 
-/** Returns the global stdev of the score returned by the calculate method.
+/** Returns the global standard deviation of the score returned by the calculate method
   *
-  * This method uses [[org.apache.spark.util.StatCounter]] library, a one pass
-  * method is used for calculation.
+  * This method uses org.apache.spark.util.StatCounter library, a one pass
+  * method is used for calculation
   *
   * @tparam EI Evaluation information
   * @tparam Q Query
@@ -153,10 +161,10 @@ abstract class StdevMetric[EI, Q, P, A]
   }
 }
 
-/** Returns the global stdev of the non-None score returned by the calculate method.
+/** Returns the global standard deviation of the non-None score returned by the calculate method
   *
-  * This method uses [[org.apache.spark.util.StatCounter]] library, a one pass
-  * method is used for calculation.
+  * This method uses org.apache.spark.util.StatCounter library, a one pass
+  * method is used for calculation
   *
   * @tparam EI Evaluation information
   * @tparam Q Query
@@ -224,6 +232,10 @@ class ZeroMetric[EI, Q, P, A] extends Metric[EI, Q, P, A, Double]() {
    def calculate(sc: SparkContext, evalDataSet: Seq[(EI, RDD[(Q, P, A)])]): Double = 0.0
 }
 
+/** Companion object of [[ZeroMetric]]
+  *
+  * @group Evaluation
+  */
 object ZeroMetric {
   /** Returns a ZeroMetric instance using Engine's type parameters. */
   def apply[EI, Q, P, A](engine: BaseEngine[EI, Q, P, A]): ZeroMetric[EI, Q, P, A] = {
@@ -232,8 +244,23 @@ object ZeroMetric {
 }
 
 
-/** Trait for metric which returns a score based on Query, PredictedResult, and ActualResult.
+/** Trait for metric which returns a score based on Query, PredictedResult,
+  * and ActualResult
+  *
+  * @tparam Q Query class
+  * @tparam P Predicted result class
+  * @tparam A Actual result class
+  * @tparam R Metric result class
+  * @group Evaluation
   */
 trait QPAMetric[Q, P, A, R] {
+  /** Calculate a metric result based on query, predicted result, and actual
+    * result
+    *
+    * @param q Query
+    * @param p Predicted result
+    * @param a Actual result
+    * @return Metric result
+    */
   def calculate(q: Q, p: P, a: A): R
 }

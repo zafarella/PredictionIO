@@ -36,7 +36,7 @@ which one to be deployed when you create an Engine.
 
 ## The Roles of an Engine
 
-THe main functions of an engine are:
+The main functions of an engine are:
 
 * Train a model using the training data and be deployed as a web service
 * Respond to prediction query in real-time
@@ -71,3 +71,14 @@ The following graph shows the workflow of DASE components when `pio train` is ru
 The following graph shows the workflow of DASE components when a REST query is received by a deployed engine.
 
 ![Engine Overview](/images/engine-query.png)
+
+Please see [Implement DASE](/customize/dase) for DASE implementation details.
+
+Please refer to following templates and their how-to guides for concrete examples.
+
+## Examples of DASE
+
+- [DASE of Recommendation Template](/templates/recommendation/dase/)
+- [DASE of Similar Product Template](/templates/similarproduct/dase/)
+- [DASE of Classification Template](/templates/classification/dase/)
+- [DASE of Lead Scoring Template](/templates/leadscoring/dase/)

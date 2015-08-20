@@ -2,8 +2,8 @@
 title: DASE Components Explained (Classification)
 ---
 
-<%= partial 'shared/dase/dase', 
-locals: { 
+<%= partial 'shared/dase/dase',
+locals: {
   template_name: 'Classification Engine Template',
   evaluation_link: '/evaluation/paramtuning/'
 } %>
@@ -14,11 +14,13 @@ As you can see from the Quick Start, *MyClassification* takes a JSON prediction
 query, e.g. `{ "features": [4, 3, 8] }`, and return a JSON predicted result.
 
 In MyClassification/src/main/scala/***Engine.scala***, the `Query` case class
-defines the format of **query**, such as `{ "features": [4, 3, 8] }`:
+defines the format of **query**, such as `{ "attr0":4, "attr1":3, "attr2":8 }`:
 
 ```scala
 class Query(
-  val features: Array[Double]
+  val attr0 : Double,
+  val attr1 : Double,
+  val attr2 : Double
 ) extends Serializable
 
 ```
@@ -73,7 +75,7 @@ method of the class `DataSource` reads, and selects, data from datastore of
 EventServer and it returns `TrainingData`.
 
 ```scala
-case class DataSourceParams(appId: Int) extends Params
+case class DataSourceParams(appName: String) extends Params
 
 class DataSource(val dsp: DataSourceParams)
   extends PDataSource[TrainingData, EmptyEvaluationInfo, Query, EmptyActualResult] {
@@ -82,9 +84,9 @@ class DataSource(val dsp: DataSourceParams)
 
   override
   def readTraining(sc: SparkContext): TrainingData = {
-    val eventsDb = Storage.getPEvents()
-    val labeledPoints: RDD[LabeledPoint] = eventsDb.aggregateProperties(
-      appId = dsp.appId,
+
+    val labeledPoints: RDD[LabeledPoint] = PEventStore.aggregateProperties(
+      appName = dsp.appName,
       entityType = "user",
       // only keep entities with these required properties defined
       required = Some(List("plan", "attr0", "attr1", "attr2")))(sc)
@@ -113,13 +115,12 @@ class DataSource(val dsp: DataSourceParams)
 }
 ```
 
-`Storage.getPEvents()` returns a data access object which you could use to
-access data that is collected through the *Event Server*, and
-`eventsDb.aggregateProperties` aggregates the event records of the 4 properties
+`PEventStore` is an object which provides function to access data that is collected through the *Event Server*, and
+`PEventStore.aggregateProperties` aggregates the event records of the 4 properties
 (attr0, attr1, attr2 and plan) for each user.
 
 PredictionIO automatically loads the parameters of *datasource* specified in
-MyEngine/***engine.json***, including *appId*, to `dsp`.
+MyEngine/***engine.json***, including *appName*, to `dsp`.
 
 In ***engine.json***:
 
@@ -128,7 +129,7 @@ In ***engine.json***:
   ...
   "datasource": {
     "params": {
-      "appId": 2
+      "appName": "MyApp1"
     }
   },
   ...
@@ -227,11 +228,10 @@ case class AlgorithmParams(
 `NaiveBayes.train` then returns a `NaiveBayesModel` model. PredictionIO will
 automatically store the returned model.
 
-### predict(..,)
+### predict(...)
 
 The `predict` method is called when you send a JSON query to
-http://localhost:8000/queries.json. PredictionIO converts the query, such as `{
-"features": [4, 3, 8] }` to the `Query` class you defined previously.
+http://localhost:8000/queries.json. PredictionIO converts the query, such as `{ "attr0":4, "attr1":3, "attr2":8 }` to the `Query` class you defined previously.
 
 The predictive model `NaiveBayesModel` of MLlib NaiveBayes offers a function
 called `predict`. `predict` takes a dense vector of features. It predicts the
@@ -239,7 +239,9 @@ label of the item represented by this feature vector.
 
 ```scala
   def predict(model: NaiveBayesModel, query: Query): PredictedResult = {
-    val label = model.predict(Vectors.dense(query.features))
+    val label = model.predict(Vectors.dense(
+    	query.attr0, query.attr1, query.attr2
+    ))
     new PredictedResult(label)
   }
 ```

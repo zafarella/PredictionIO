@@ -15,6 +15,7 @@
 
 package io.prediction.workflow
 
+import io.prediction.controller.EngineParams
 import io.prediction.controller.Params
 import io.prediction.controller.Utils
 import org.json4s.CustomSerializer
@@ -266,6 +267,13 @@ class JsonExtractorSuite extends FunSuite with Matchers {
     json should be ("""{"algo":{"p":"parameter"}}""")
   }
 
+  test("Java Param to Json using option Gson") {
+    val param = ("algo", new JavaParams("parameter"))
+    val json = JsonExtractor.paramToJson(JsonExtractorOption.Gson, param)
+
+    json should be ("""{"algo":{"p":"parameter"}}""")
+  }
+
   test("Scala Param to Json using option Both") {
     val param = ("algo", AlgorithmParams("parameter"))
     val json = JsonExtractor.paramToJson(JsonExtractorOption.Both, param)
@@ -273,9 +281,23 @@ class JsonExtractorSuite extends FunSuite with Matchers {
     json should be ("""{"algo":{"a":"parameter"}}""")
   }
 
+  test("Scala Param to Json using option Json4sNative") {
+    val param = ("algo", AlgorithmParams("parameter"))
+    val json = JsonExtractor.paramToJson(JsonExtractorOption.Json4sNative, param)
+
+    json should be ("""{"algo":{"a":"parameter"}}""")
+  }
+
   test("Java Params to Json using option Both") {
     val params = Seq(("algo", new JavaParams("parameter")), ("algo2", new JavaParams("parameter2")))
     val json = JsonExtractor.paramsToJson(JsonExtractorOption.Both, params)
+
+    json should be ("""[{"algo":{"p":"parameter"}},{"algo2":{"p":"parameter2"}}]""")
+  }
+
+  test("Java Params to Json using option Gson") {
+    val params = Seq(("algo", new JavaParams("parameter")), ("algo2", new JavaParams("parameter2")))
+    val json = JsonExtractor.paramsToJson(JsonExtractorOption.Gson, params)
 
     json should be ("""[{"algo":{"p":"parameter"}},{"algo2":{"p":"parameter2"}}]""")
   }
@@ -288,6 +310,14 @@ class JsonExtractorSuite extends FunSuite with Matchers {
     json should be (org.json4s.native.Serialization.write(params)(Utils.json4sDefaultFormats))
   }
 
+  test("Scala Params to Json using option Json4sNative") {
+    val params =
+      Seq(("algo", AlgorithmParams("parameter")), ("algo2", AlgorithmParams("parameter2")))
+    val json = JsonExtractor.paramsToJson(JsonExtractorOption.Json4sNative, params)
+
+    json should be (org.json4s.native.Serialization.write(params)(Utils.json4sDefaultFormats))
+  }
+
   test("Mixed Java and Scala Params to Json using option Both") {
     val params =
       Seq(("scala", AlgorithmParams("parameter")), ("java", new JavaParams("parameter2")))
@@ -295,9 +325,47 @@ class JsonExtractorSuite extends FunSuite with Matchers {
 
     json should be ("""[{"scala":{"a":"parameter"}},{"java":{"p":"parameter2"}}]""")
   }
+
+  test("Serializing Scala EngineParams works using option Json4sNative") {
+    val ep = new EngineParams(
+      dataSourceParams = ("ds", DataSourceParams("dsp")),
+      algorithmParamsList = Seq(("a0", AlgorithmParams("ap"))))
+
+    val json = JsonExtractor.engineParamsToJson(JsonExtractorOption.Json4sNative, ep)
+
+    json should be (
+      """{"dataSourceParams":{"ds":{"a":"dsp"}},"preparatorParams":{"":{}},""" +
+        """"algorithmParamsList":[{"a0":{"a":"ap"}}],"servingParams":{"":{}}}""")
+  }
+
+  test("Serializing Java EngineParams works using option Gson") {
+    val ep = new EngineParams(
+      dataSourceParams = ("ds", new JavaParams("dsp")),
+      algorithmParamsList = Seq(("a0", new JavaParams("ap")), ("a1", new JavaParams("ap2"))))
+
+    val json = JsonExtractor.engineParamsToJson(JsonExtractorOption.Gson, ep)
+
+    json should be (
+      """{"dataSourceParams":{"ds":{"p":"dsp"}},"preparatorParams":{"":{}},""" +
+        """"algorithmParamsList":[{"a0":{"p":"ap"}},{"a1":{"p":"ap2"}}],"servingParams":{"":{}}}""")
+  }
+
+  test("Serializing Java EngineParams works using option Both") {
+    val ep = new EngineParams(
+      dataSourceParams = ("ds", new JavaParams("dsp")),
+      algorithmParamsList = Seq(("a0", new JavaParams("ap")), ("a1", new JavaParams("ap2"))))
+
+    val json = JsonExtractor.engineParamsToJson(JsonExtractorOption.Both, ep)
+
+    json should be (
+      """{"dataSourceParams":{"ds":{"p":"dsp"}},"preparatorParams":{"":{}},""" +
+        """"algorithmParamsList":[{"a0":{"p":"ap"}},{"a1":{"p":"ap2"}}],"servingParams":{"":{}}}""")
+  }
 }
 
 private case class AlgorithmParams(a: String) extends Params
+
+private case class DataSourceParams(a: String) extends Params
 
 private case class ScalaQuery(string: String, optional: Option[String], default: String = "default")
 

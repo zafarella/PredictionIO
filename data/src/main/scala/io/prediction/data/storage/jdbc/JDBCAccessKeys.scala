@@ -23,100 +23,62 @@ import scalikejdbc._
 
 import scala.util.Random
 
-/** JDBC implementation of AccessKeys. */
+/** JDBC implementation of [[AccessKeys]] */
 class JDBCAccessKeys(client: String, config: StorageClientConfig, prefix: String)
   extends AccessKeys with Logging {
+  /** Database table name for this data access object */
   val tableName = JDBCUtils.prefixTableName(prefix, "accesskeys")
   DB autoCommit { implicit session =>
-    try {
-      sql"""
-      create table $tableName (
-        key varchar(64) not null primary key,
-        appid integer not null,
-        events text)""".execute().apply()
-    } catch {
-      case e: Exception => debug(e.getMessage, e)
-    }
+    sql"""
+    create table if not exists $tableName (
+      accesskey varchar(64) not null primary key,
+      appid integer not null,
+      events text)""".execute().apply()
   }
 
   def insert(accessKey: AccessKey): Option[String] = DB localTx { implicit s =>
-    val generatedkey = Random.alphanumeric.take(64).mkString
-    try {
-      sql"""
-      insert into $tableName values(
-        $generatedkey,
-        ${accessKey.appid},
-        ${accessKey.events.mkString(",")})""".update().apply()
-      Some(generatedkey)
-    } catch {
-      case e: Exception =>
-        error(e.getMessage, e)
-        None
-    }
+    val key = if (accessKey.key.isEmpty) generateKey else accessKey.key
+    val events = if (accessKey.events.isEmpty) None else Some(accessKey.events.mkString(","))
+    sql"""
+    insert into $tableName values(
+      $key,
+      ${accessKey.appid},
+      $events)""".update().apply()
+    Some(key)
   }
 
   def get(key: String): Option[AccessKey] = DB readOnly { implicit session =>
-    try {
-      sql"SELECT key, appid, events FROM $tableName WHERE key = $key".
-        map(resultToAccessKey).single().apply()
-    } catch {
-      case e: Exception =>
-        error(e.getMessage, e)
-        None
-    }
+    sql"SELECT accesskey, appid, events FROM $tableName WHERE accesskey = $key".
+      map(resultToAccessKey).single().apply()
   }
 
   def getAll(): Seq[AccessKey] = DB readOnly { implicit session =>
-    try {
-      sql"SELECT key, appid, events FROM $tableName".map(resultToAccessKey).list().apply()
-    } catch {
-      case e: Exception =>
-        error(e.getMessage, e)
-        Seq()
-    }
+    sql"SELECT accesskey, appid, events FROM $tableName".map(resultToAccessKey).list().apply()
   }
 
   def getByAppid(appid: Int): Seq[AccessKey] = DB readOnly { implicit session =>
-    try {
-      sql"SELECT key, appid, events FROM $tableName WHERE appid = $appid".
-        map(resultToAccessKey).list().apply()
-    } catch {
-      case e: Exception =>
-        error(e.getMessage, e)
-        Seq()
-    }
+    sql"SELECT accesskey, appid, events FROM $tableName WHERE appid = $appid".
+      map(resultToAccessKey).list().apply()
   }
 
-  def update(accessKey: AccessKey): Boolean = DB localTx { implicit session =>
-    try {
-      sql"""
-      UPDATE $tableName SET
-        appid = ${accessKey.appid},
-        events = ${accessKey.events.mkString(",")}
-      WHERE key = ${accessKey.key}""".update().apply()
-      true
-    } catch {
-      case e: Exception =>
-        error(e.getMessage, e)
-        false
-    }
+  def update(accessKey: AccessKey): Unit = DB localTx { implicit session =>
+    val events = if (accessKey.events.isEmpty) None else Some(accessKey.events.mkString(","))
+    sql"""
+    UPDATE $tableName SET
+      appid = ${accessKey.appid},
+      events = $events
+    WHERE accesskey = ${accessKey.key}""".update().apply()
   }
 
-  def delete(key: String): Boolean = DB localTx { implicit session =>
-    try {
-      sql"DELETE FROM $tableName WHERE key = $key".update().apply()
-      true
-    } catch {
-      case e: Exception =>
-        error(e.getMessage, e)
-        false
-    }
+  def delete(key: String): Unit = DB localTx { implicit session =>
+    sql"DELETE FROM $tableName WHERE accesskey = $key".update().apply()
   }
 
+  /** Convert JDBC results to [[AccessKey]] */
   def resultToAccessKey(rs: WrappedResultSet): AccessKey = {
     AccessKey(
-      key = rs.string("key"),
+      key = rs.string("accesskey"),
       appid = rs.int("appid"),
-      events = rs.string("events").split(","))
+      events = rs.stringOpt("events").map(_.split(",").toSeq).getOrElse(Nil))
   }
 }

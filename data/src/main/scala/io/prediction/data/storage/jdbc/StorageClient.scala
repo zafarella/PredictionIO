@@ -21,20 +21,25 @@ import io.prediction.data.storage.StorageClientConfig
 import io.prediction.data.storage.StorageClientException
 import scalikejdbc._
 
+/** JDBC implementation of [[BaseStorageClient]] */
 class StorageClient(val config: StorageClientConfig)
   extends BaseStorageClient with Logging {
   override val prefix = "JDBC"
 
-  if (!config.properties.contains("URL"))
-    throw new StorageClientException("The URL variable is not set!")
-  if (!config.properties.contains("USERNAME"))
-    throw new StorageClientException("The USERNAME variable is not set!")
-  if (!config.properties.contains("PASSWORD"))
-    throw new StorageClientException("The PASSWORD variable is not set!")
+  if (!config.properties.contains("URL")) {
+    throw new StorageClientException("The URL variable is not set!", null)
+  }
+  if (!config.properties.contains("USERNAME")) {
+    throw new StorageClientException("The USERNAME variable is not set!", null)
+  }
+  if (!config.properties.contains("PASSWORD")) {
+    throw new StorageClientException("The PASSWORD variable is not set!", null)
+  }
 
   ConnectionPool.singleton(
     config.properties("URL"),
     config.properties("USERNAME"),
     config.properties("PASSWORD"))
+  /** JDBC connection URL. Connections are managed by ScalikeJDBC. */
   val client = config.properties("URL")
 }

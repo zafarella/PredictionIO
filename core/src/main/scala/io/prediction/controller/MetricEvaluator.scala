@@ -15,13 +15,18 @@
 
 package io.prediction.controller
 
-import io.prediction.core.BaseEvaluator
-import io.prediction.core.BaseEvaluatorResult
-import io.prediction.data.storage.Storage
-import io.prediction.workflow.NameParamsSerializer
+import _root_.java.io.File
+import _root_.java.io.PrintWriter
 
 import com.github.nscala_time.time.Imports.DateTime
 import grizzled.slf4j.Logger
+import io.prediction.annotation.DeveloperApi
+import io.prediction.core.BaseEvaluator
+import io.prediction.core.BaseEvaluatorResult
+import io.prediction.data.storage.Storage
+import io.prediction.workflow.JsonExtractor
+import io.prediction.workflow.JsonExtractorOption.Both
+import io.prediction.workflow.NameParamsSerializer
 import io.prediction.workflow.WorkflowParams
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -30,13 +35,29 @@ import org.json4s.native.Serialization.writePretty
 
 import scala.language.existentials
 
-import _root_.java.io.PrintWriter
-import _root_.java.io.File
-
+/** Case class storing a primary score, and other scores
+  *
+  * @param score Primary metric score
+  * @param otherScores Other scores this metric might have
+  * @tparam R Type of the primary metric score
+  * @group Evaluation
+  */
 case class MetricScores[R](
   score: R,
   otherScores: Seq[Any])
 
+/** Contains all results of a [[MetricEvaluator]]
+  *
+  * @param bestScore The best score among all iterations
+  * @param bestEngineParams The set of engine parameters that yielded the best score
+  * @param bestIdx The index of iteration that yielded the best score
+  * @param metricHeader Brief description of the primary metric score
+  * @param otherMetricHeaders Brief descriptions of other metric scores
+  * @param engineParamsScores All sets of engine parameters and corresponding metric scores
+  * @param outputPath An optional output path where scores are saved
+  * @tparam R Type of the primary metric score
+  * @group Evaluation
+  */
 case class MetricEvaluatorResult[R](
   bestScore: MetricScores[R],
   bestEngineParams: EngineParams,
@@ -58,35 +79,37 @@ extends BaseEvaluatorResult {
     write(this)
   }
   
-  override def toHTML(): String = html.metric_evaluator().toString
+  override def toHTML(): String = html.metric_evaluator().toString()
   
   override def toString: String = {
     implicit lazy val formats = Utils.json4sDefaultFormats +
       new NameParamsSerializer
     
-    val bestEPStr = writePretty(bestEngineParams)
+    val bestEPStr = JsonExtractor.engineParamstoPrettyJson(Both, bestEngineParams)
 
-    val strings = (
-      Seq(
-        "MetricEvaluatorResult:",
-        s"  # engine params evaluated: ${engineParamsScores.size}") ++
+    val strings = Seq(
+      "MetricEvaluatorResult:",
+      s"  # engine params evaluated: ${engineParamsScores.size}") ++
       Seq(
         "Optimal Engine Params:",
         s"  $bestEPStr",
         "Metrics:",
         s"  $metricHeader: ${bestScore.score}") ++
-      otherMetricHeaders.zip(bestScore.otherScores).map { 
+      otherMetricHeaders.zip(bestScore.otherScores).map {
         case (h, s) => s"  $h: $s"
       } ++
       outputPath.toSeq.map {
         p => s"The best variant params can be found in $p"
       }
-    )
 
     strings.mkString("\n")
   }
 }
 
+/** Companion object of [[MetricEvaluator]]
+  *
+  * @group Evaluation
+  */
 object MetricEvaluator {
   def apply[EI, Q, P, A, R](
     metric: Metric[EI, Q, P, A, R],
@@ -140,14 +163,29 @@ object MetricEvaluator {
   }
 }
 
-
-private[prediction] class MetricEvaluator[EI, Q, P, A, R] (
+/** :: DeveloperApi ::
+  * Do no use this directly. Use [[MetricEvaluator$]] instead. This is an
+  * implementation of [[io.prediction.core.BaseEvaluator]] that evaluates
+  * prediction performance based on metric scores.
+  *
+  * @param metric Primary metric
+  * @param otherMetrics Other metrics
+  * @param outputPath Optional output path to save evaluation results
+  * @tparam EI Evaluation information type
+  * @tparam Q Query class
+  * @tparam P Predicted result class
+  * @tparam A Actual result class
+  * @tparam R Metric result class
+  * @group Evaluation
+  */
+@DeveloperApi
+class MetricEvaluator[EI, Q, P, A, R] (
   val metric: Metric[EI, Q, P, A, R],
   val otherMetrics: Seq[Metric[EI, Q, P, A, _]],
   val outputPath: Option[String])
   extends BaseEvaluator[EI, Q, P, A, MetricEvaluatorResult[R]] {
   @transient lazy val logger = Logger[this.type]
-  @transient val engineInstances = Storage.getMetaDataEngineInstances
+  @transient val engineInstances = Storage.getMetaDataEngineInstances()
 
   def saveEngineJson(
     evaluation: Evaluation,
@@ -171,7 +209,7 @@ private[prediction] class MetricEvaluator[EI, Q, P, A, R] (
     logger.info(s"Writing best variant params to disk ($outputPath)...")
     val writer = new PrintWriter(new File(outputPath))
     writer.write(writePretty(variant))
-    writer.close
+    writer.close()
   }
 
   def evaluateBase(
@@ -194,17 +232,17 @@ private[prediction] class MetricEvaluator[EI, Q, P, A, R] (
     implicit lazy val formats = Utils.json4sDefaultFormats +
       new NameParamsSerializer
 
-    evalResultList.zipWithIndex.foreach { case ((ep, r), idx) => {
+    evalResultList.zipWithIndex.foreach { case ((ep, r), idx) =>
       logger.info(s"Iteration $idx")
-      logger.info(s"EngineParams: ${write(ep)}")
+      logger.info(s"EngineParams: ${JsonExtractor.engineParamsToJson(Both, ep)}")
       logger.info(s"Result: $r")
-    }}
+    }
 
     // use max. take implicit from Metric.
     val ((bestEngineParams, bestScore), bestIdx) = evalResultList
     .zipWithIndex
     .reduce { (x, y) =>
-      (if (metric.compare(x._1._2.score, y._1._2.score) >= 0) x else y)
+      if (metric.compare(x._1._2.score, y._1._2.score) >= 0) x else y
     }
 
     // save engine params if it is set.

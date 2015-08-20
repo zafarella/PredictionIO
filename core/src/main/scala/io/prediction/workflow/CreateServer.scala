@@ -15,16 +15,10 @@
 
 package io.prediction.workflow
 
-import io.prediction.controller.Engine
-import io.prediction.controller.Params
-import io.prediction.controller.Utils
-import io.prediction.controller.WithPrId
-import io.prediction.core.BaseAlgorithm
-import io.prediction.core.BaseServing
-import io.prediction.core.Doer
-import io.prediction.data.storage.EngineInstance
-import io.prediction.data.storage.EngineManifest
-import io.prediction.data.storage.Storage
+import java.io.PrintWriter
+import java.io.Serializable
+import java.io.StringWriter
+import java.util.concurrent.TimeUnit
 
 import akka.actor._
 import akka.event.Logging
@@ -38,12 +32,24 @@ import com.twitter.chill.KryoInjection
 import com.twitter.chill.ScalaKryoInstantiator
 import de.javakaffee.kryoserializers.SynchronizedCollectionsSerializer
 import grizzled.slf4j.Logging
+import io.prediction.controller.Engine
+import io.prediction.controller.Params
+import io.prediction.controller.Utils
+import io.prediction.controller.WithPrId
+import io.prediction.core.BaseAlgorithm
+import io.prediction.core.BaseServing
+import io.prediction.core.Doer
+import io.prediction.data.storage.EngineInstance
+import io.prediction.data.storage.EngineManifest
+import io.prediction.data.storage.Storage
+import io.prediction.workflow.JsonExtractorOption.JsonExtractorOption
 import org.json4s._
 import org.json4s.native.JsonMethods._
 import org.json4s.native.Serialization.write
 import spray.can.Http
 import spray.http.MediaTypes._
 import spray.http._
+import spray.httpx.Json4sSupport
 import spray.routing._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -54,8 +60,6 @@ import scala.language.existentials
 import scala.util.Failure
 import scala.util.Random
 import scala.util.Success
-
-import java.io.{Serializable, PrintWriter, StringWriter}
 
 class KryoInstantiator(classLoader: ClassLoader) extends ScalaKryoInstantiator {
   override def newKryo(): KryoBase = {
@@ -78,6 +82,8 @@ case class ServerConfig(
   engineInstanceId: String = "",
   engineId: Option[String] = None,
   engineVersion: Option[String] = None,
+  engineVariant: String = "",
+  env: Option[String] = None,
   ip: String = "0.0.0.0",
   port: Int = 8000,
   feedback: Boolean = false,
@@ -88,7 +94,8 @@ case class ServerConfig(
   logPrefix: Option[String] = None,
   logFile: Option[String] = None,
   verbose: Boolean = false,
-  debug: Boolean = false)
+  debug: Boolean = false,
+  jsonExtractor: JsonExtractorOption = JsonExtractorOption.Both)
 
 case class StartServer()
 case class BindServer()
@@ -113,9 +120,16 @@ object CreateServer extends Logging {
       opt[String]("engineVersion") action { (x, c) =>
         c.copy(engineVersion = Some(x))
       } text("Engine version.")
+      opt[String]("engine-variant") required() action { (x, c) =>
+        c.copy(engineVariant = x)
+      } text("Engine variant JSON.")
       opt[String]("ip") action { (x, c) =>
         c.copy(ip = x)
       }
+      opt[String]("env") action { (x, c) =>
+        c.copy(env = Some(x))
+      } text("Comma-separated list of environmental variables (in 'FOO=BAR' " +
+        "format) to pass to the Spark execution environment.")
       opt[Int]("port") action { (x, c) =>
         c.copy(port = x)
       } text("Port to bind to (default: 8000).")
@@ -149,6 +163,9 @@ object CreateServer extends Logging {
       opt[Unit]("debug") action { (x, c) =>
         c.copy(debug = true)
       } text("Enable debug output.")
+      opt[String]("json-extractor") action { (x, c) =>
+        c.copy(jsonExtractor = JsonExtractorOption.withName(x))
+      }
     }
 
     parser.parse(args, ServerConfig()) map { sc =>
@@ -193,7 +210,7 @@ object CreateServer extends Logging {
     engineLanguage: EngineLanguage.Value,
     manifest: EngineManifest): ActorRef = {
 
-    val engineParams = engine.engineInstanceToEngineParams(engineInstance)
+    val engineParams = engine.engineInstanceToEngineParams(engineInstance, sc.jsonExtractor)
 
     val kryo = KryoInstantiator.newKryoInjection
 
@@ -201,8 +218,14 @@ object CreateServer extends Logging {
       kryo.invert(modeldata.get(engineInstance.id).get.models).get.
       asInstanceOf[Seq[Any]]
 
+    val batch = if (engineInstance.batch.nonEmpty) {
+      s"${engineInstance.engineFactory} (${engineInstance.batch})"
+    } else {
+      engineInstance.engineFactory
+    }
+
     val sparkContext = WorkflowContext(
-      batch = if (sc.batch == "") engineInstance.batch else sc.batch,
+      batch = batch,
       executorEnv = engineInstance.env,
       mode = "Serving",
       sparkEnv = engineInstance.sparkConf)
@@ -334,7 +357,8 @@ class MasterActor(
           s"${manifest.version}. Abort reloading.")
       }
     case x: Http.Bound =>
-      log.info("Bind successful. Ready to serve.")
+      val serverUrl = s"http://${sc.ip}:${sc.port}"
+      log.info(s"Engine is deployed and running. Engine API is live at ${serverUrl}.")
       sprayHttpListener = Some(sender)
     case x: Http.CommandFailed =>
       if (retry > 0) {
@@ -395,7 +419,13 @@ class ServerActor[Q, P](
   var avgServingSec: Double = 0.0
   var lastServingSec: Double = 0.0
 
+  /** The following is required by HttpService */
   def actorRefFactory: ActorContext = context
+
+  implicit val timeout = Timeout(5, TimeUnit.SECONDS)
+  val pluginsActorRef =
+    context.actorOf(Props(classOf[PluginsActor], args.engineVariant), "PluginsActor")
+  val pluginContext = EngineServerPluginContext(log, args.engineVariant)
 
   def receive: Actor.Receive = runRoute(myRoute)
 
@@ -463,27 +493,36 @@ class ServerActor[Q, P](
           entity(as[String]) { queryString =>
             try {
               val servingStartTime = DateTime.now
-              val jsonExtractorOption = JsonExtractorOption.Both
+              val jsonExtractorOption = args.jsonExtractor
               val queryTime = DateTime.now
+              // Extract Query from Json
               val query = JsonExtractor.extract(
                 jsonExtractorOption,
                 queryString,
                 algorithms.head.queryClass,
                 algorithms.head.querySerializer,
-                algorithms.head.gsonTypeAdpaterFactories
+                algorithms.head.gsonTypeAdapterFactories
               )
+              val queryJValue = JsonExtractor.toJValue(
+                jsonExtractorOption,
+                query,
+                algorithms.head.querySerializer,
+                algorithms.head.gsonTypeAdapterFactories)
+              // Deploy logic. First call Serving.supplement, then Algo.predict,
+              // finally Serving.serve.
+              val supplementedQuery = serving.supplementBase(query)
+              // TODO: Parallelize the following.
               val predictions = algorithms.zipWithIndex.map { case (a, ai) =>
-                a.predictBase(models(ai), query)
+                a.predictBase(models(ai), supplementedQuery)
               }
+              // Notice that it is by design to call Serving.serve with the
+              // *original* query.
               val prediction = serving.serveBase(query, predictions)
               val predictionJValue = JsonExtractor.toJValue(
                 jsonExtractorOption,
                 prediction,
                 algorithms.head.querySerializer,
-                algorithms.head.gsonTypeAdpaterFactories)
-              val r = (predictionJValue,
-                prediction,
-                query)
+                algorithms.head.gsonTypeAdapterFactories)
               /** Handle feedback to Event Server
                 * Send the following back to the Event Server
                 * - appId
@@ -501,7 +540,7 @@ class ServerActor[Q, P](
                   }
                 // val genPrId = Random.alphanumeric.take(64).mkString
                 def genPrId: String = Random.alphanumeric.take(64).mkString
-                val newPrId = r._2 match {
+                val newPrId = prediction match {
                   case id: WithPrId =>
                     val org = id.prId
                     if (org.isEmpty) genPrId else org
@@ -510,7 +549,7 @@ class ServerActor[Q, P](
 
                 // also save Query's prId as prId of this pio_pr predict events
                 val queryPrId =
-                  r._3 match {
+                  query match {
                     case id: WithPrId =>
                       Map("prId" -> id.prId)
                     case _ =>
@@ -524,8 +563,8 @@ class ServerActor[Q, P](
                   "entityId" -> newPrId,
                   "properties" -> Map(
                     "engineInstanceId" -> engineInstance.id,
-                    "query" -> r._3,
-                    "prediction" -> r._2)) ++ queryPrId
+                    "query" -> query,
+                    "prediction" -> prediction)) ++ queryPrId
                 // At this point args.accessKey should be Some(String).
                 val accessKey = args.accessKey.getOrElse("")
                 val f: Future[Int] = future {
@@ -549,12 +588,17 @@ class ServerActor[Q, P](
                 // - if it is WithPrId,
                 //   then overwrite with new prId
                 // - if it is not WithPrId, no prId injection
-                if (r._2.isInstanceOf[WithPrId]) {
-                  r._1 merge parse( s"""{"prId" : "$newPrId"}""")
+                if (prediction.isInstanceOf[WithPrId]) {
+                  predictionJValue merge parse(s"""{"prId" : "$newPrId"}""")
                 } else {
-                  r._1
+                  predictionJValue
                 }
-              } else r._1
+              } else predictionJValue
+
+              val pluginResult =
+                pluginContext.outputBlockers.values.foldLeft(result) { case (r, p) =>
+                  p.process(engineInstance, queryJValue, r, pluginContext)
+                }
 
               // Bookkeeping
               val servingEndTime = DateTime.now
@@ -566,7 +610,7 @@ class ServerActor[Q, P](
               requestCount += 1
 
               respondWithMediaType(`application/json`) {
-                complete(compact(render(result)))
+                complete(compact(render(pluginResult)))
               }
             } catch {
               case e: MappingException =>
@@ -616,5 +660,54 @@ class ServerActor[Q, P](
     } ~
     pathPrefix("assets") {
       getFromResourceDirectory("assets")
+    } ~
+    path("plugins.json") {
+      import EngineServerJson4sSupport._
+      get {
+        respondWithMediaType(MediaTypes.`application/json`) {
+          complete {
+            Map("plugins" -> Map(
+              "outputblockers" -> pluginContext.outputBlockers.map { case (n, p) =>
+                n -> Map(
+                  "name" -> p.pluginName,
+                  "description" -> p.pluginDescription,
+                  "class" -> p.getClass.getName,
+                  "params" -> pluginContext.pluginParams(p.pluginName))
+              },
+              "outputsniffers" -> pluginContext.outputSniffers.map { case (n, p) =>
+                n -> Map(
+                  "name" -> p.pluginName,
+                  "description" -> p.pluginDescription,
+                  "class" -> p.getClass.getName,
+                  "params" -> pluginContext.pluginParams(p.pluginName))
+              }
+            ))
+          }
+        }
+      }
+    } ~
+    path("plugins" / Segments) { segments =>
+      import EngineServerJson4sSupport._
+      get {
+        respondWithMediaType(MediaTypes.`application/json`) {
+          complete {
+            val pluginArgs = segments.drop(2)
+            val pluginType = segments(0)
+            val pluginName = segments(1)
+            pluginType match {
+              case EngineServerPlugin.outputSniffer =>
+                pluginsActorRef ? PluginsActor.HandleREST(
+                  pluginName = pluginName,
+                  pluginArgs = pluginArgs) map {
+                  _.asInstanceOf[String]
+                }
+            }
+          }
+        }
+      }
     }
+}
+
+object EngineServerJson4sSupport extends Json4sSupport {
+  implicit def json4sFormats: Formats = DefaultFormats
 }

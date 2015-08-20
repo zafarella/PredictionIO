@@ -16,26 +16,28 @@
 package io.prediction.tools.console
 
 import java.io.File
+import java.net.URI
 
 import grizzled.slf4j.Logging
-
 import io.prediction.controller.Utils
 import io.prediction.core.BuildInfo
 import io.prediction.data.api.EventServer
 import io.prediction.data.api.EventServerConfig
+import io.prediction.data.storage
 import io.prediction.data.storage.EngineManifest
 import io.prediction.data.storage.EngineManifestSerializer
-import io.prediction.data.storage.Storage
 import io.prediction.data.storage.hbase.upgrade.Upgrade_0_8_3
-import io.prediction.tools.admin.{AdminServer, AdminServerConfig}
 import io.prediction.tools.RegisterEngine
 import io.prediction.tools.RunServer
 import io.prediction.tools.RunWorkflow
+import io.prediction.tools.admin.AdminServer
+import io.prediction.tools.admin.AdminServerConfig
 import io.prediction.tools.dashboard.Dashboard
 import io.prediction.tools.dashboard.DashboardConfig
+import io.prediction.workflow.JsonExtractorOption
+import io.prediction.workflow.JsonExtractorOption.JsonExtractorOption
 import io.prediction.workflow.WorkflowUtils
 import org.apache.commons.io.FileUtils
-import org.apache.hadoop.fs.Path
 import org.json4s._
 import org.json4s.native.JsonMethods._
 import org.json4s.native.Serialization.read
@@ -87,7 +89,9 @@ case class CommonArgs(
   skipSanityCheck: Boolean = false,
   verbose: Boolean = false,
   verbosity: Int = 0,
-  sparkKryo: Boolean = false)
+  sparkKryo: Boolean = false,
+  scratchUri: Option[URI] = None,
+  jsonExtractor: JsonExtractorOption = JsonExtractorOption.Both)
 
 case class BuildArgs(
   sbt: Option[File] = None,
@@ -156,22 +160,10 @@ object Console extends Logging {
         "deployment.")
       opt[File]("variant") abbr("v") action { (x, c) =>
         c.copy(common = c.common.copy(variantJson = x))
-      } validate { x =>
-        if (x.exists) {
-          success
-        } else {
-          failure(s"${x.getCanonicalPath} does not exist.")
-        }
-      } text("Path to an engine variant JSON file. Default: engine.json")
+      }
       opt[File]("manifest") abbr("m") action { (x, c) =>
         c.copy(common = c.common.copy(manifestJson = x))
-      } validate { x =>
-        if (x.exists) {
-          success
-        } else {
-          failure(s"${x.getCanonicalPath} does not exist.")
-        }
-      } text("Path to an engine manifest JSON file. Default: manifest.json")
+      }
       opt[File]("sbt") action { (x, c) =>
         c.copy(build = c.build.copy(sbt = Some(x)))
       } validate { x =>
@@ -186,6 +178,9 @@ object Console extends Logging {
       }
       opt[Unit]("spark-kryo") abbr("sk") action { (x, c) =>
         c.copy(common = c.common.copy(sparkKryo = true))
+      }
+      opt[String]("scratch-uri") action { (x, c) =>
+        c.copy(common = c.common.copy(scratchUri = Some(new URI(x))))
       }
       note("")
       cmd("version").
@@ -268,6 +263,16 @@ object Console extends Logging {
           },
           opt[String]("engine-params-key") action { (x, c) =>
             c.copy(common = c.common.copy(engineParamsKey = Some(x)))
+          },
+          opt[String]("json-extractor") action { (x, c) =>
+            c.copy(common = c.common.copy(jsonExtractor = JsonExtractorOption.withName(x)))
+          } validate { x =>
+              if (JsonExtractorOption.values.map(_.toString).contains(x)) {
+                success
+              } else {
+                val validOptions = JsonExtractorOption.values.mkString("|")
+                failure(s"$x is not a valid json-extractor option [$validOptions]")
+              }
           }
         )
       note("")
@@ -286,7 +291,17 @@ object Console extends Logging {
           } text("Optional engine parameters generator class, overriding the first argument"),
           opt[String]("batch") action { (x, c) =>
             c.copy(common = c.common.copy(batch = x))
-          } text("Batch label of the run.")
+          } text("Batch label of the run."),
+          opt[String]("json-extractor") action { (x, c) =>
+            c.copy(common = c.common.copy(jsonExtractor = JsonExtractorOption.withName(x)))
+          } validate { x =>
+            if (JsonExtractorOption.values.map(_.toString).contains(x)) {
+              success
+            } else {
+              val validOptions = JsonExtractorOption.values.mkString("|")
+              failure(s"$x is not a valid json-extractor option [$validOptions]")
+            }
+          }
         )
       note("")
       cmd("deploy").
@@ -334,6 +349,16 @@ object Console extends Logging {
           },
           opt[String]("log-prefix") action { (x, c) =>
             c.copy(deploy = c.deploy.copy(logPrefix = Some(x)))
+          },
+          opt[String]("json-extractor") action { (x, c) =>
+            c.copy(common = c.common.copy(jsonExtractor = JsonExtractorOption.withName(x)))
+          } validate { x =>
+            if (JsonExtractorOption.values.map(_.toString).contains(x)) {
+              success
+            } else {
+              val validOptions = JsonExtractorOption.values.mkString("|")
+              failure(s"$x is not a valid json-extractor option [$validOptions]")
+            }
           }
         )
       note("")
@@ -451,13 +476,16 @@ object Console extends Logging {
             } children(
               opt[Int]("id") action { (x, c) =>
                 c.copy(app = c.app.copy(id = Some(x)))
-              } text("Specify this if you already have data under an app ID."),
+              },
               opt[String]("description") action { (x, c) =>
                 c.copy(app = c.app.copy(description = Some(x)))
-              } text("Specify this if you already have data under an app ID."),
+              },
+              opt[String]("access-key") action { (x, c) =>
+                c.copy(accessKey = c.accessKey.copy(accessKey = x))
+              },
               arg[String]("<name>") action { (x, c) =>
                 c.copy(app = c.app.copy(name = x))
-              } text("App name.")
+              }
             ),
           note(""),
           cmd("list").
@@ -539,14 +567,17 @@ object Console extends Logging {
             action { (_, c) =>
               c.copy(commands = c.commands :+ "new")
             } children(
+              opt[String]("key") action { (x, c) =>
+                c.copy(accessKey = c.accessKey.copy(accessKey = x))
+              },
               arg[String]("<app name>") action { (x, c) =>
                 c.copy(app = c.app.copy(name = x))
-              } text("App to be associated with the new access key."),
+              },
               arg[String]("[<event1> <event2> ...]") unbounded() optional()
                 action { (x, c) =>
                   c.copy(accessKey = c.accessKey.copy(
                     events = c.accessKey.events :+ x))
-                } text("Allowed event name(s) to be added to the access key.")
+                }
             ),
           cmd("list").
             text("List all access keys of an app.").
@@ -720,9 +751,9 @@ object Console extends Logging {
         case Seq("template", "list") =>
           Template.list(ca)
         case Seq("export") =>
-          Export.eventsToFile(ca, coreAssembly(ca.common.pioHome.get))
+          Export.eventsToFile(ca)
         case Seq("import") =>
-          Import.fileToEvents(ca, coreAssembly(ca.common.pioHome.get))
+          Import.fileToEvents(ca)
         case _ =>
           System.err.println(help(ca.commands))
           1
@@ -774,28 +805,15 @@ object Console extends Logging {
     compile(ca)
     info("Looking for an engine...")
     val jarFiles = jarFilesForScala
-    if (jarFiles.size == 0) {
+    if (jarFiles.isEmpty) {
       error("No engine found. Your build might have failed. Aborting.")
       return 1
     }
     jarFiles foreach { f => info(s"Found ${f.getName}")}
-    val copyLocal = if (sys.env.contains("HADOOP_CONF_DIR")) {
-      info("HADOOP_CONF_DIR is set. Assuming HDFS is available.")
-      true
-    } else {
-      info("HADOOP_CONF_DIR is not set. Assuming HDFS is unavailable.")
-      false
-    }
-    val finalJarFiles = if (sys.env.contains("HADOOP_CONF_DIR") && !ca.build.uberJar) {
-      info("Also copying PredictionIO core assembly.")
-      jarFiles :+ coreAssembly(ca.common.pioHome.get)
-    } else {
-      jarFiles
-    }
     RegisterEngine.registerEngine(
       ca.common.manifestJson,
-      finalJarFiles,
-      copyLocal)
+      jarFiles,
+      false)
     info("Your engine is ready for training.")
     0
   }
@@ -810,20 +828,7 @@ object Console extends Logging {
       ca.common.manifestJson,
       ca.common.engineId,
       ca.common.engineVersion) { em =>
-      if (ca.build.uberJar) {
-        val uniqueJars =
-          em.files.map(_.split(Path.SEPARATOR_CHAR).last).groupBy(identity).keys
-        if (uniqueJars.size > 1) {
-          error("Uber JAR mode cannot be turned on when current build produced " +
-            "more than 1 engine JAR files. Aborting.")
-          return 1
-        }
-      }
-      RunWorkflow.runWorkflow(
-        ca,
-        coreAssembly(ca.common.pioHome.get),
-        em,
-        ca.common.variantJson)
+      RunWorkflow.newRunWorkflow(ca, em)
     }
   }
 
@@ -841,18 +846,14 @@ object Console extends Logging {
             s"${ca.common.variantJson.getCanonicalPath}. Aborting.")
           return 1
       }
-      val engineInstances = Storage.getMetaDataEngineInstances
+      val engineInstances = storage.Storage.getMetaDataEngineInstances
       val engineInstance = ca.engineInstanceId map { eid =>
         engineInstances.get(eid)
       } getOrElse {
         engineInstances.getLatestCompleted(em.id, em.version, variantId)
       }
       engineInstance map { r =>
-        RunServer.runServer(
-          ca,
-          coreAssembly(ca.common.pioHome.get),
-          em,
-          r.id)
+        RunServer.newRunServer(ca, em, r.id)
       } getOrElse {
         ca.engineInstanceId map { eid =>
           error(
@@ -962,8 +963,13 @@ object Console extends Logging {
         dst,
         true)
     } else {
-      info(s"Uber JAR disabled. Making sure lib/${core.getName} is absent.")
-      new File("lib", core.getName).delete()
+      if (new File("engine.json").exists()) {
+        info(s"Uber JAR disabled. Making sure lib/${core.getName} is absent.")
+        new File("lib", core.getName).delete()
+      } else {
+        info("Uber JAR disabled, but current working directory does not look " +
+          s"like an engine project directory. Please delete lib/${core.getName} manually.")
+      }
     }
     info(s"Going to run: ${buildCmd}")
     try {
@@ -1025,60 +1031,75 @@ object Console extends Logging {
   }
 
   def status(ca: ConsoleArgs): Int = {
-    println("PredictionIO")
+    info("Inspecting PredictionIO...")
     ca.common.pioHome map { pioHome =>
-      println(s"  Installed at: ${pioHome}")
-      println(s"  Version: ${BuildInfo.version}")
+      info(s"PredictionIO ${BuildInfo.version} is installed at $pioHome")
     } getOrElse {
-      println("Unable to locate PredictionIO installation. Aborting.")
+      error("Unable to locate PredictionIO installation. Aborting.")
       return 1
     }
-    println("")
+    info("Inspecting Apache Spark...")
     val sparkHome = getSparkHome(ca.common.sparkHome)
-    if (new File(s"${sparkHome}/bin/spark-submit").exists) {
-      println(s"Apache Spark")
-      println(s"  Installed at: ${sparkHome}")
+    if (new File(s"$sparkHome/bin/spark-submit").exists) {
+      info(s"Apache Spark is installed at $sparkHome")
       val sparkMinVersion = "1.3.0"
-      val sparkReleaseFile = new File(s"${sparkHome}/RELEASE")
+      val sparkReleaseFile = new File(s"$sparkHome/RELEASE")
       if (sparkReleaseFile.exists) {
         val sparkReleaseStrings =
           Source.fromFile(sparkReleaseFile).mkString.split(' ')
-        val sparkReleaseVersion = sparkReleaseStrings(1)
-        val parsedMinVersion = Version.apply(sparkMinVersion)
-        val parsedCurrentVersion = Version.apply(sparkReleaseVersion)
-        if (parsedCurrentVersion >= parsedMinVersion) {
-          println(s"  Version: ${sparkReleaseVersion} (meets minimum " +
-            s"requirement of ${sparkMinVersion})")
+        if (sparkReleaseStrings.length < 2) {
+          warn(stripMarginAndNewlines(
+            s"""|Apache Spark version information cannot be found (RELEASE file
+                |is empty). This is a known issue for certain vendors (e.g.
+                |Cloudera). Please make sure you are using a version of at least
+                |$sparkMinVersion."""))
         } else {
-          println("  Version: ${sparkReleaseVersion}")
-          println("Apache Spark version does not meet minimum requirement. " +
-            "Aborting.")
+          val sparkReleaseVersion = sparkReleaseStrings(1)
+          val parsedMinVersion = Version.apply(sparkMinVersion)
+          val parsedCurrentVersion = Version.apply(sparkReleaseVersion)
+          if (parsedCurrentVersion >= parsedMinVersion) {
+            info(stripMarginAndNewlines(
+              s"""|Apache Spark $sparkReleaseVersion detected (meets minimum
+                  |requirement of $sparkMinVersion)"""))
+          } else {
+            error(stripMarginAndNewlines(
+              s"""|Apache Spark $sparkReleaseVersion detected (does not meet
+                  |minimum requirement. Aborting."""))
+          }
         }
       } else {
-        println("  Version information cannot be found.")
-        println("  If you are using a developmental tree, please make sure")
-        println(s"  you are using a version of at least ${sparkMinVersion}.")
+        warn(stripMarginAndNewlines(
+          s"""|Apache Spark version information cannot be found. If you are
+              |using a developmental tree, please make sure you are using a
+              |version of at least $sparkMinVersion."""))
       }
     } else {
-      println("Unable to locate a proper Apache Spark installation. Aborting.")
+      error("Unable to locate a proper Apache Spark installation. Aborting.")
       return 1
     }
-    println("")
-    println("Storage Backend Connections")
+    info("Inspecting storage backend connections...")
     try {
-      Storage.verifyAllDataObjects()
+      storage.Storage.verifyAllDataObjects()
     } catch {
       case e: Throwable =>
-        e.printStackTrace
-        println("")
-        println("Unable to connect to all storage backend(s) successfully. " +
-          "Please refer to error message(s) above. Aborting.")
+        error("Unable to connect to all storage backends successfully. The " +
+          "following shows the error message from the storage backend.")
+        error(s"${e.getMessage} (${e.getClass.getName})", e)
+        error("Dumping configuration of initialized storage backend sources. " +
+          "Please make sure they are correct.")
+        storage.Storage.config.get("sources") map { src =>
+          src foreach { case (s, p) =>
+            error(s"Source Name: $s; Type: ${p.getOrElse("type", "(error)")}; " +
+              s"Configuration: ${p.getOrElse("config", "(error)")}")
+          }
+        } getOrElse {
+          error("No properly configured storage backend sources.")
+        }
         return 1
     }
-    println("")
-    println("(sleeping 5 seconds for all messages to show up...)")
+    info("(sleeping 5 seconds for all messages to show up...)")
     Thread.sleep(5000)
-    println("Your system is all ready to go.")
+    info("Your system is all ready to go.")
     0
   }
 
@@ -1181,7 +1202,7 @@ object Console extends Logging {
     val ej = readManifestJson(json)
     val id = engineId getOrElse ej.id
     val version = engineVersion getOrElse ej.version
-    Storage.getMetaDataEngineManifests.get(id, version) map {
+    storage.Storage.getMetaDataEngineManifests.get(id, version) map {
       op
     } getOrElse {
       error(s"Engine ${id} ${version} cannot be found in the system.")
@@ -1218,7 +1239,7 @@ object Console extends Logging {
 
   def getSparkHome(sparkHome: Option[String]): String = {
     sparkHome getOrElse {
-      sys.env.get("SPARK_HOME").getOrElse(".")
+      sys.env.getOrElse("SPARK_HOME", ".")
     }
   }
 
@@ -1241,4 +1262,7 @@ object Console extends Logging {
       if (f.exists) f.getCanonicalPath else "sbt"
     }
   }
+
+  def stripMarginAndNewlines(string: String): String =
+    string.stripMargin.replaceAll("\n", " ")
 }

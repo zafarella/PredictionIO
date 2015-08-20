@@ -21,7 +21,6 @@ import io.prediction.data.storage.Event
 import org.joda.time.DateTime
 
 import scala.concurrent.Await
-import scala.concurrent.TimeoutException
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 

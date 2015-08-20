@@ -15,8 +15,7 @@
 
 package io.prediction.tools.console
 
-import io.prediction.data.storage.{AccessKey => StorageAccessKey}
-import io.prediction.data.storage.Storage
+import io.prediction.data.storage
 
 import grizzled.slf4j.Logging
 
@@ -26,11 +25,11 @@ case class AccessKeyArgs(
 
 object AccessKey extends Logging {
   def create(ca: ConsoleArgs): Int = {
-    val apps = Storage.getMetaDataApps
+    val apps = storage.Storage.getMetaDataApps
     apps.getByName(ca.app.name) map { app =>
-      val accessKeys = Storage.getMetaDataAccessKeys
-      val accessKey = accessKeys.insert(StorageAccessKey(
-        key = "",
+      val accessKeys = storage.Storage.getMetaDataAccessKeys
+      val accessKey = accessKeys.insert(storage.AccessKey(
+        key = ca.accessKey.accessKey,
         appid = app.id,
         events = ca.accessKey.events))
       accessKey map { k =>
@@ -49,11 +48,11 @@ object AccessKey extends Logging {
   def list(ca: ConsoleArgs): Int = {
     val keys =
       if (ca.app.name == "") {
-        Storage.getMetaDataAccessKeys.getAll
+        storage.Storage.getMetaDataAccessKeys.getAll
       } else {
-        val apps = Storage.getMetaDataApps
+        val apps = storage.Storage.getMetaDataApps
         apps.getByName(ca.app.name) map { app =>
-          Storage.getMetaDataAccessKeys.getByAppid(app.id)
+          storage.Storage.getMetaDataAccessKeys.getByAppid(app.id)
         } getOrElse {
           error(s"App ${ca.app.name} does not exist. Aborting.")
           return 1
@@ -64,19 +63,21 @@ object AccessKey extends Logging {
     keys.sortBy(k => k.appid) foreach { k =>
       val events =
         if (k.events.size > 0) k.events.sorted.mkString(",") else "(all)"
-      info(f"${k.key}%s | ${k.appid}%6d | ${events}%s")
+      info(f"${k.key}%64s | ${k.appid}%6d | $events%s")
     }
     info(s"Finished listing ${keys.size} access key(s).")
     0
   }
 
   def delete(ca: ConsoleArgs): Int = {
-    if (Storage.getMetaDataAccessKeys.delete(ca.accessKey.accessKey)) {
+    try {
+      storage.Storage.getMetaDataAccessKeys.delete(ca.accessKey.accessKey)
       info(s"Deleted access key ${ca.accessKey.accessKey}.")
       0
-    } else {
-      error(s"Error deleting access key ${ca.accessKey.accessKey}.")
-      1
+    } catch {
+      case e: Exception =>
+        error(s"Error deleting access key ${ca.accessKey.accessKey}.", e)
+        1
     }
   }
 }

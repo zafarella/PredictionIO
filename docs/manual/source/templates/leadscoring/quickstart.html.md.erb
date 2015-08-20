@@ -44,18 +44,39 @@ NOTE: You can customize what the "conversion" event is. It's "buy" item event by
 
 <%= partial 'shared/quickstart/create_app' %>
 
-## 4a. Collecting Data
+## 4. Collecting Data
 
 Next, let's collect training data for this Engine. By default,
  Lead Scoring Engine Template supports the following entities: **user**, **page**, and **item**. An user views a page, and buys an item.
 
 Note that a "sessionId" property is required to indicate these events happen in the same session. In the first visit of a user, you should specify the optional "referrral ID" and "browser" information. These are used to determine where the user comes from and the browser information.
 
-<%= partial 'shared/quickstart/install_sdk' %>
+In summary, this template requires user-view-page event and user-buy-item events with the session ID, referrer ID and browser properties.
 
-The following is sample code of using different SDKs to import events of user-view-page, user-buy-item with the session ID, referrer ID and browser properties.
+<%= partial 'shared/quickstart/collect_data' %>
+
+For example, when an user with ID u0 views a URL page "example.com/page0" on time  `2014-11-02T09:39:45.618-08:00`, with session ID "akdj230fj8ass" (current time will be used if eventTime is not specified) you can send the event to Event Server. Run the following `curl` command:
 
 <div class="tabs">
+  <div data-tab="REST API" data-lang="json">
+```
+$ curl -i -X POST http://localhost:7070/events.json?accessKey=$ACCESS_KEY \
+-H "Content-Type: application/json" \
+-d '{
+  "event" : "view",
+  "entityType" : "user"
+  "entityId" : "u0",
+  "targetEntityType" : "page",
+  "targetEntityId" : "example.com/page0",
+  "properties" : {
+    "sessionId" : "akdj230fj8ass",
+    "referrerId" : "referrer0.com",
+    "browser" : "Firefox"
+  }
+  "eventTime" : "2014-11-02T09:39:45.618-08:00"
+}'
+```
+  </div>
   <div data-tab="Python SDK" data-lang="python">
 ```python
 import predictionio
@@ -66,7 +87,6 @@ client = predictionio.EventClient(
   threads=5,
   qsize=500
 )
-
 
 # A user views a page
 
@@ -82,24 +102,10 @@ client.create_event(
     "browser": <BROWSER> # optinal. but should specify this if you have this information when user views the landing page
   }
 )
-
-# A user buys an item
-
-client.create_event(
-  event="buy",
-  entity_type="user",
-  entity_id=<USER ID>,
-  target_entity_type="item",
-  target_entity_id=<ITEM ID>,
-  properties = {
-    "sessionId": <SESSION ID>, # required
-  }
-)
-
 ```
   </div>
-  <div data-tab="PHP SDK" data-lang="php">
 
+  <div data-tab="PHP SDK" data-lang="php">
 ```php
 <?php
 require_once("vendor/autoload.php");
@@ -120,24 +126,10 @@ $client->createEvent(array(
     'browser' => <BROWSER>
   )
 ));
-
-// A user buys an item
-$client->createEvent(array(
-  'event' => 'buy',
-  'entityType' => 'user',
-  'entityId' => <USER ID>,
-  'targetEntityType' => 'item',
-  'targetEntityId' => <ITEM ID>,
-  'properties' => array(
-    'sessionId' => <SESSION ID>
-  )
-));
-
 ?>
 ```
   </div>
   <div data-tab="Ruby SDK" data-lang="ruby">
-
 ```ruby
 # Create a client object.
 client = PredictionIO::EventClient.new(<ACCESS KEY>, <URL OF EVENTSERVER>)
@@ -156,24 +148,9 @@ client.create_event(
     }
   }
 )
-
-# A user buys an item.
-client.create_event(
-  'buy',
-  'user',
-  <USER ID>, {
-    'targetEntityType' => 'item',
-    'targetEntityId' => <ITEM ID>,
-    'properties' => {
-      'sessionId' => <SESSION ID>
-    }
-  }
-)
-
 ```
   </div>
   <div data-tab="Java SDK" data-lang="java">
-
 ```java
 import io.prediction.Event;
 import io.prediction.EventClient;
@@ -193,7 +170,84 @@ Event viewEvent = new Event()
     .property("referrerId", "<REFERRER ID>")
     .property("browser", "<BROWSER>");
 client.createEvent(viewEvent);
+```
+  </div>
+</div>
 
+
+In the same browing session "akdj230fj8ass", the user with ID u0 buys an item i0 on time `2014-11-02T09:42:00.123-08:00` (current time will be used if eventTime is not specified), you can send the following buy event. Run the following `curl` command:
+
+<div class="tabs">
+  <div data-tab="REST API" data-lang="json">
+```
+$ curl -i -X POST http://localhost:7070/events.json?accessKey=$ACCESS_KEY \
+-H "Content-Type: application/json" \
+-d '{
+  "event" : "buy",
+  "entityType" : "user"
+  "entityId" : "u0",
+  "targetEntityType" : "item",
+  "targetEntityId" : "i0",
+  "properties" : {
+    "sessionId" : "akdj230fj8ass"
+  }
+  "eventTime" : "2014-11-02T09:42:00.123-08:00"
+}'
+```
+  </div>
+  <div data-tab="Python SDK" data-lang="python">
+```python
+# A user buys an item
+
+client.create_event(
+  event="buy",
+  entity_type="user",
+  entity_id=<USER ID>,
+  target_entity_type="item",
+  target_entity_id=<ITEM ID>,
+  properties = {
+    "sessionId": <SESSION ID>, # required
+  }
+)
+```
+  </div>
+
+  <div data-tab="PHP SDK" data-lang="php">
+```php
+<?php
+// A user buys an item
+$client->createEvent(array(
+  'event' => 'buy',
+  'entityType' => 'user',
+  'entityId' => <USER ID>,
+  'targetEntityType' => 'item',
+  'targetEntityId' => <ITEM ID>,
+  'properties' => array(
+    'sessionId' => <SESSION ID>
+  )
+));
+
+?>
+```
+  </div>
+  <div data-tab="Ruby SDK" data-lang="ruby">
+```ruby
+# A user buys an item.
+client.create_event(
+  'buy',
+  'user',
+  <USER ID>, {
+    'targetEntityType' => 'item',
+    'targetEntityId' => <ITEM ID>,
+    'properties' => {
+      'sessionId' => <SESSION ID>
+    }
+  }
+)
+```
+  </div>
+  <div data-tab="Java SDK" data-lang="java">
+```java
 // A user buys an item
 Event buyEvent = new Event()
     .event("buy")
@@ -203,59 +257,21 @@ Event buyEvent = new Event()
     .targetEntityId(<ITEM_ID>)
     .property("sessionId", "<SESSION ID>");
 client.createEvent(buyEvent);
-
-```
-  </div>
-  <div data-tab="REST API" data-lang="json">
-```
-
-# A user views a page
-
-curl -i -X POST <URL OF EVENTSERVER>/events.json?accessKey=<ACCESS KEY> \
--H "Content-Type: application/json" \
--d '{
-  "event" : "view",
-  "entityType" : "user"
-  "entityId" : <USER ID>,
-  "targetEntityType" : "page",
-  "targetEntityId" : <PAGE ID>,
-  "properties" : {
-    "sessionId" : <SESSION ID>,
-    "referrerId" : <REFERRER ID>,
-    "browser" : <BROWSER>
-  }
-  "eventTime" : <TIME OF THIS EVENT>
-}'
-
-# A user buys an item
-
-curl -i -X POST <URL OF EVENTSERVER>/events.json?accessKey=<ACCESS KEY> \
--H "Content-Type: application/json" \
--d '{
-  "event" : "buy",
-  "entityType" : "user"
-  "entityId" : <USER ID>,
-  "targetEntityType" : "item",
-  "targetEntityId" : <ITEM ID>,
-  "properties" : {
-    "sessionId" : <SESSION ID>
-  }
-  "eventTime" : <TIME OF THIS EVENT>
-}'
-
 ```
   </div>
 </div>
 
-## 4b. Import Sample Data
+<%= partial 'shared/quickstart/query_eventserver' %>
+
+### Import More Sample Data
 
 <%= partial 'shared/quickstart/import_sample_data' %>
 
 A Python import script `import_eventserver.py` is provided to import sample data. The sample data includes 50 sessions of events. In each session, a randomly selected user (with user ID "u1" to "u10") lands on a page (randomly selected from example.com/page1 to example.com/page20) with referrerId (randomly selected from referrer1.com to referrer10.com) and browser information. The user may view more pages, and may or may not buy an item (with item ID "i1" to "i50").
 
-NOTE: You need to install Python SDK to run the import script. Please follow [Python SDK README](https://github.com/PredictionIO/PredictionIO-Python-SDK) to install.
+<%= partial 'shared/quickstart/install_python_sdk' %>
 
-First, make sure you are under the `MyLeadScoring` directory. Execute the following to import the data (Replace the value of access_key parameter with your **Access Key**):
+Make sure you are under the `MyLeadScoring` directory. Execute the following to import the data (Replace the value of access_key parameter with your **Access Key**):
 
 ```
 $ cd MyLeadScoring
@@ -275,8 +291,7 @@ User u5 buys item i5
 166 events are imported.
 ```
 
-WARNING: If you see error **TypeError: __init__() got an unexpected keyword argument 'access_key'**,
-please update the Python SDK to the latest version.
+<%= partial 'shared/quickstart/query_eventserver_short' %>
 
 ## 5. Deploy the Engine as a Service
 
@@ -286,11 +301,24 @@ please update the Python SDK to the latest version.
 
 ## 6. Use the Engine
 
-Now, You can retrieve the results. When a user lands on your page "example.com/page9", with referrer "referrer10.com" and browser "Firefox", you can get the predicted lead score by sending this JSON '{ "landingPageId" : "example.com/page9", "referrerId" : "referrer10.com", "browser": "Firefox" }' to the deployed engine. The engine will return a JSON with the score
+Now, You can retrieve the results. When a user lands on your page "example.com/page9", with referrer "referrer10.com" and browser "Firefox", you can get the predicted lead score by sending this JSON '{ "landingPageId" : "example.com/page9", "referrerId" : "referrer10.com", "browser": "Firefox" }' to the deployed engine. The engine will return a JSON with the score.
 
-Simply send a query by making a HTTP request or through the `EngineClient` of an SDK:
+Simply send a query by making a HTTP request or through the `EngineClient` of an SDK.
+
+With the deployed engine running, open another temrinal and run the following `curl` command or use SDK to send the query:
 
 <div class="tabs">
+  <div data-tab="REST API" data-lang="json">
+```
+$ curl -H "Content-Type: application/json" \
+-d '{
+  "landingPageId" : "example.com/page9",
+  "referrerId" : "referrer10.com",
+  "browser": "Firefox" }' \
+http://localhost:8000/queries.json
+
+```
+  </div>
   <div data-tab="Python SDK" data-lang="python">
 ```python
 import predictionio
@@ -356,17 +384,6 @@ JsonObject response = engineClient.sendQuery(ImmutableMap.<String, Object>of(
   "referrerId", "referrer10.com",
   "browser", "Firefox"
 ));
-```
-  </div>
-  <div data-tab="REST API" data-lang="json">
-```
-$ curl -H "Content-Type: application/json" \
--d '{
-  "landingPageId" : "example.com/page9",
-  "referrerId" : "referrer10.com",
-  "browser": "Firefox" }' \
-http://localhost:8000/queries.json
-
 ```
   </div>
 </div>

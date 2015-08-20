@@ -4,17 +4,16 @@
   overflow: hidden;
 }
 
-.container {
-  float: left;
-  width: 100%;
-  background-color: $off-canvas-background-color;
-}
-
-
 .group {
   display: inline-block;
 }
 
 .new {
   color: $danger-color;
+}
+
+.logo-dark {
+  background-color: $logo-dark-color;
+  display: inline-block;
+  font-size: 0;
 }

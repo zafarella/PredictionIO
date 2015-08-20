@@ -26,6 +26,7 @@ import io.prediction.data.storage.EngineInstance
 import io.prediction.data.storage.StorageClientException
 import io.prediction.workflow.CreateWorkflow
 import io.prediction.workflow.EngineLanguage
+import io.prediction.workflow.JsonExtractorOption.JsonExtractorOption
 import io.prediction.workflow.NameParamsSerializer
 import io.prediction.workflow.PersistentModelManifest
 import io.prediction.workflow.SparkWorkflowUtils
@@ -40,6 +41,7 @@ import org.json4s._
 import org.json4s.native.JsonMethods._
 import org.json4s.native.Serialization.read
 
+import scala.collection.JavaConversions
 import scala.language.implicitConversions
 
 /** This class chains up the entire data process. PredictionIO uses this
@@ -106,6 +108,23 @@ class Engine[TD, EI, PD, Q, P, A](
       algorithmClassMap,
       Map("" -> servingClass)
     )
+
+  /** Java-friendly constructor
+    *
+    * @param dataSourceClass Data source class.
+    * @param preparatorClass Preparator class.
+    * @param algorithmClassMap Map of algorithm names to classes.
+    * @param servingClass Serving class.
+    */
+  def this(dataSourceClass: Class[_ <: BaseDataSource[TD, EI, Q, A]],
+    preparatorClass: Class[_ <: BasePreparator[TD, PD]],
+    algorithmClassMap: _root_.java.util.Map[String, Class[_ <: BaseAlgorithm[PD, _, Q, P]]],
+    servingClass: Class[_ <: BaseServing[Q, P]]) = this(
+    Map("" -> dataSourceClass),
+    Map("" -> preparatorClass),
+    JavaConversions.mapAsScalaMap(algorithmClassMap).toMap,
+    Map("" -> servingClass)
+  )
 
   /** Returns a new Engine instance, mimicking case class's copy method behavior.
     */
@@ -316,7 +335,7 @@ class Engine[TD, EI, PD, Q, P, A](
               "Existing algorithm name(s) are: " +
               s"${algorithmClassMap.keys.mkString(", ")}. Aborting.")
           } else {
-            logger.error(s"${algoName} cannot be found in the engine's " +
+            logger.error(s"$algoName cannot be found in the engine's " +
               "definition. Existing algorithm name(s) are: " +
               s"${algorithmClassMap.keys.mkString(", ")}. Aborting.")
           }
@@ -331,7 +350,10 @@ class Engine[TD, EI, PD, Q, P, A](
     Engine.eval(sc, dataSource, preparator, algorithms, serving)
   }
 
-  override def jValueToEngineParams(variantJson: JValue): EngineParams = {
+  override def jValueToEngineParams(
+    variantJson: JValue,
+    jsonExtractor: JsonExtractorOption): EngineParams = {
+
     val engineLanguage = EngineLanguage.Scala
     // Extract EngineParams
     logger.info(s"Extracting datasource params...")
@@ -340,8 +362,9 @@ class Engine[TD, EI, PD, Q, P, A](
         variantJson,
         "datasource",
         dataSourceClassMap,
-        engineLanguage)
-    logger.info(s"Datasource params: ${dataSourceParams}")
+        engineLanguage,
+        jsonExtractor)
+    logger.info(s"Datasource params: $dataSourceParams")
 
     logger.info(s"Extracting preparator params...")
     val preparatorParams: (String, Params) =
@@ -349,8 +372,9 @@ class Engine[TD, EI, PD, Q, P, A](
         variantJson,
         "preparator",
         preparatorClassMap,
-        engineLanguage)
-    logger.info(s"Preparator params: ${preparatorParams}")
+        engineLanguage,
+        jsonExtractor)
+    logger.info(s"Preparator params: $preparatorParams")
 
     val algorithmsParams: Seq[(String, Params)] =
       variantJson findField {
@@ -366,7 +390,8 @@ class Engine[TD, EI, PD, Q, P, A](
               WorkflowUtils.extractParams(
                 engineLanguage,
                 compact(render(eap.params)),
-                algorithmClassMap(eap.name))
+                algorithmClassMap(eap.name),
+                jsonExtractor)
             )
           }
           case _ => Nil
@@ -379,8 +404,9 @@ class Engine[TD, EI, PD, Q, P, A](
         variantJson,
         "serving",
         servingClassMap,
-        engineLanguage)
-    logger.info(s"Serving params: ${servingParams}")
+        engineLanguage,
+        jsonExtractor)
+    logger.info(s"Serving params: $servingParams")
 
     new EngineParams(
       dataSourceParams = dataSourceParams,
@@ -389,8 +415,10 @@ class Engine[TD, EI, PD, Q, P, A](
       servingParams = servingParams)
   }
 
-  private[prediction]
-  def engineInstanceToEngineParams(engineInstance: EngineInstance): EngineParams = {
+  private[prediction] def engineInstanceToEngineParams(
+    engineInstance: EngineInstance,
+    jsonExtractor: JsonExtractorOption): EngineParams = {
+
     implicit val formats = DefaultFormats
     val engineLanguage = EngineLanguage.Scala
 
@@ -398,14 +426,15 @@ class Engine[TD, EI, PD, Q, P, A](
       val (name, params) =
         read[(String, JValue)](engineInstance.dataSourceParams)
       if (!dataSourceClassMap.contains(name)) {
-        logger.error(s"Unable to find datasource class with name '${name}'" +
+        logger.error(s"Unable to find datasource class with name '$name'" +
           " defined in Engine.")
         sys.exit(1)
       }
       val extractedParams = WorkflowUtils.extractParams(
         engineLanguage,
         compact(render(params)),
-        dataSourceClassMap(name))
+        dataSourceClassMap(name),
+        jsonExtractor)
       (name, extractedParams)
     }
 
@@ -413,14 +442,15 @@ class Engine[TD, EI, PD, Q, P, A](
       val (name, params) =
         read[(String, JValue)](engineInstance.preparatorParams)
       if (!preparatorClassMap.contains(name)) {
-        logger.error(s"Unable to find preparator class with name '${name}'" +
+        logger.error(s"Unable to find preparator class with name '$name'" +
           " defined in Engine.")
         sys.exit(1)
       }
       val extractedParams = WorkflowUtils.extractParams(
         engineLanguage,
         compact(render(params)),
-        preparatorClassMap(name))
+        preparatorClassMap(name),
+        jsonExtractor)
       (name, extractedParams)
     }
 
@@ -430,21 +460,23 @@ class Engine[TD, EI, PD, Q, P, A](
           val extractedParams = WorkflowUtils.extractParams(
             engineLanguage,
             compact(render(params)),
-            algorithmClassMap(algoName))
+            algorithmClassMap(algoName),
+            jsonExtractor)
           (algoName, extractedParams)
       }
 
     val servingParamsWithName: (String, Params) = {
       val (name, params) = read[(String, JValue)](engineInstance.servingParams)
       if (!servingClassMap.contains(name)) {
-        logger.error(s"Unable to find serving class with name '${name}'" +
+        logger.error(s"Unable to find serving class with name '$name'" +
           " defined in Engine.")
         sys.exit(1)
       }
       val extractedParams = WorkflowUtils.extractParams(
         engineLanguage,
         compact(render(params)),
-        servingClassMap(name))
+        servingClassMap(name),
+        jsonExtractor)
       (name, extractedParams)
     }
 
@@ -601,7 +633,7 @@ object Engine {
     if (params.skipSanityCheck) {
       logger.info("Data sanity check is off.")
     } else {
-      logger.info("Data santiy check is on.")
+      logger.info("Data sanity check is on.")
     }
 
     val td = try {
@@ -730,11 +762,15 @@ object Engine {
       algoMap.mapValues(_.trainBase(sc,pd))
     }}
 
+    val suppQAsMap: Map[EX, RDD[(QX, (Q, A))]] = evalQAsMap.mapValues { qas => 
+      qas.map { case (qx, (q, a)) => (qx, (serving.supplementBase(q), a)) }
+    }
+
     val algoPredictsMap: Map[EX, RDD[(QX, Seq[P])]] = (0 until evalCount)
     .map { ex => {
       val modelMap: Map[AX, Any] = algoModelsMap(ex)
 
-      val qs: RDD[(QX, Q)] = evalQAsMap(ex).mapValues(_._1)
+      val qs: RDD[(QX, Q)] = suppQAsMap(ex).mapValues(_._1)
 
       val algoPredicts: Seq[RDD[(QX, (AX, P))]] = (0 until algoCount)
       .map { ax => {
@@ -748,7 +784,7 @@ object Engine {
       }}
 
       val unionAlgoPredicts: RDD[(QX, Seq[P])] = sc.union(algoPredicts)
-      .groupByKey
+      .groupByKey()
       .mapValues { ps => {
         assert (ps.size == algoCount, "Must have same length as algoCount")
         // TODO. Check size == algoCount
@@ -761,6 +797,8 @@ object Engine {
 
     val servingQPAMap: Map[EX, RDD[(Q, P, A)]] = algoPredictsMap
     .map { case (ex, psMap) => {
+      // The query passed to serving.serve is the original one, not
+      // supplemented.
       val qasMap: RDD[(QX, (Q, A))] = evalQAsMap(ex)
       val qpsaMap: RDD[(QX, Q, Seq[P], A)] = psMap.join(qasMap)
       .map { case (qx, t) => (qx, t._2._1, t._1, t._2._2) }

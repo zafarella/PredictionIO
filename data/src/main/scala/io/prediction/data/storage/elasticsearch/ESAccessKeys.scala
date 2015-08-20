@@ -53,9 +53,9 @@ class ESAccessKeys(client: Client, config: StorageClientConfig, index: String)
   }
 
   def insert(accessKey: AccessKey): Option[String] = {
-    val generatedkey = Random.alphanumeric.take(64).mkString
-    val realaccesskey = accessKey.copy(key = generatedkey)
-    if (update(realaccesskey)) Some(generatedkey) else None
+    val key = if (accessKey.key.isEmpty) generateKey else accessKey.key
+    update(accessKey.copy(key = key))
+    Some(key)
   }
 
   def get(key: String): Option[AccessKey] = {
@@ -96,25 +96,21 @@ class ESAccessKeys(client: Client, config: StorageClientConfig, index: String)
     }
   }
 
-  def update(accessKey: AccessKey): Boolean = {
+  def update(accessKey: AccessKey): Unit = {
     try {
       client.prepareIndex(index, estype, accessKey.key).setSource(write(accessKey)).get()
-      true
     } catch {
       case e: ElasticsearchException =>
         error(e.getMessage)
-        false
     }
   }
 
-  def delete(key: String): Boolean = {
+  def delete(key: String): Unit = {
     try {
       client.prepareDelete(index, estype, key).get
-      true
     } catch {
       case e: ElasticsearchException =>
         error(e.getMessage)
-        false
     }
   }
 }

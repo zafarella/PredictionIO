@@ -15,6 +15,8 @@
 
 package io.prediction.workflow
 
+import java.net.URI
+
 import com.github.nscala_time.time.Imports._
 import com.google.common.io.ByteStreams
 import grizzled.slf4j.Logging
@@ -23,7 +25,7 @@ import io.prediction.core.BaseEngine
 import io.prediction.data.storage.EngineInstance
 import io.prediction.data.storage.EvaluationInstance
 import io.prediction.data.storage.Storage
-import io.prediction.workflow.JsonExtractorOption.Both
+import io.prediction.workflow.JsonExtractorOption.JsonExtractorOption
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileSystem
 import org.apache.hadoop.fs.Path
@@ -52,26 +54,16 @@ object CreateWorkflow extends Logging {
     verbosity: Int = 0,
     verbose: Boolean = false,
     debug: Boolean = false,
-    logFile: Option[String] = None)
+    logFile: Option[String] = None,
+    jsonExtractor: JsonExtractorOption = JsonExtractorOption.Both)
 
   case class AlgorithmParams(name: String, params: JValue)
 
-  val hadoopConf = new Configuration
-  val hdfs = FileSystem.get(hadoopConf)
-  val localfs = FileSystem.getLocal(hadoopConf)
-
-  private def stringFromFile(
-      basePath: String,
-      filePath: String,
-      fs: FileSystem = hdfs): String = {
+  private def stringFromFile(filePath: String): String = {
     try {
-      val p =
-        if (basePath == "") {
-          new Path(filePath)
-        } else {
-          new Path(basePath + Path.SEPARATOR + filePath)
-        }
-      new String(ByteStreams.toByteArray(fs.open(p)).map(_.toChar))
+      val uri = new URI(filePath)
+      val fs = FileSystem.get(uri, new Configuration())
+      new String(ByteStreams.toByteArray(fs.open(new Path(uri))).map(_.toChar))
     } catch {
       case e: java.io.IOException =>
         error(s"Error reading from file: ${e.getMessage}. Aborting workflow.")
@@ -80,6 +72,7 @@ object CreateWorkflow extends Logging {
   }
 
   val parser = new scopt.OptionParser[WorkflowConfig]("CreateWorkflow") {
+    override def errorOnUnknownArgument: Boolean = false
     opt[String]("batch") action { (x, c) =>
       c.copy(batch = x)
     } text("Batch label of the workflow run.")
@@ -132,6 +125,9 @@ object CreateWorkflow extends Logging {
     opt[String]("log-file") action { (x, c) =>
       c.copy(logFile = Some(x))
     }
+    opt[String]("json-extractor") action { (x, c) =>
+      c.copy(jsonExtractor = JsonExtractorOption.withName(x))
+    }
   }
 
   def main(args: Array[String]): Unit = {
@@ -144,33 +140,6 @@ object CreateWorkflow extends Logging {
     val wfc = wfcOpt.get
 
     WorkflowUtils.modifyLogging(wfc.verbose)
-    val targetfs = if (wfc.deployMode == "cluster") hdfs else localfs
-    val variantJson = parse(stringFromFile("", wfc.engineVariant, targetfs))
-    val engineFactory = if (wfc.engineFactory == "") {
-      variantJson \ "engineFactory" match {
-        case JString(s) => s
-        case _ =>
-          error("Unable to read engine factory class name from " +
-            s"${wfc.engineVariant}. Aborting.")
-            sys.exit(1)
-      }
-    } else wfc.engineFactory
-    val variantId = variantJson \ "id" match {
-      case JString(s) => s
-      case _ =>
-        error("Unable to read engine variant ID from " +
-          s"${wfc.engineVariant}. Aborting.")
-        sys.exit(1)
-    }
-    val (engineLanguage, engineFactoryObj) = try {
-      WorkflowUtils.getEngine(engineFactory, getClass.getClassLoader)
-    } catch {
-      case e @ (_: ClassNotFoundException | _: NoSuchMethodException) =>
-        error(s"Unable to obtain engine: ${e.getMessage}. Aborting workflow.")
-        sys.exit(1)
-    }
-
-    val engine: BaseEngine[_, _, _, _] = engineFactoryObj()
 
     val evaluation = wfc.evaluationClass.map { ec =>
       try {
@@ -202,16 +171,42 @@ object CreateWorkflow extends Logging {
       ).toMap
     ).getOrElse(Map())
 
-    val customSparkConf = WorkflowUtils.extractSparkConf(variantJson)
-    val workflowParams = WorkflowParams(
-      verbose = wfc.verbosity,
-      skipSanityCheck = wfc.skipSanityCheck,
-      stopAfterRead = wfc.stopAfterRead,
-      stopAfterPrepare = wfc.stopAfterPrepare,
-      sparkEnv = WorkflowParams().sparkEnv ++ customSparkConf)
-
-
     if (evaluation.isEmpty) {
+      val variantJson = parse(stringFromFile(wfc.engineVariant))
+      val engineFactory = if (wfc.engineFactory == "") {
+        variantJson \ "engineFactory" match {
+          case JString(s) => s
+          case _ =>
+            error("Unable to read engine factory class name from " +
+              s"${wfc.engineVariant}. Aborting.")
+            sys.exit(1)
+        }
+      } else wfc.engineFactory
+      val variantId = variantJson \ "id" match {
+        case JString(s) => s
+        case _ =>
+          error("Unable to read engine variant ID from " +
+            s"${wfc.engineVariant}. Aborting.")
+          sys.exit(1)
+      }
+      val (engineLanguage, engineFactoryObj) = try {
+        WorkflowUtils.getEngine(engineFactory, getClass.getClassLoader)
+      } catch {
+        case e @ (_: ClassNotFoundException | _: NoSuchMethodException) =>
+          error(s"Unable to obtain engine: ${e.getMessage}. Aborting workflow.")
+          sys.exit(1)
+      }
+
+      val engine: BaseEngine[_, _, _, _] = engineFactoryObj()
+
+      val customSparkConf = WorkflowUtils.extractSparkConf(variantJson)
+      val workflowParams = WorkflowParams(
+        verbose = wfc.verbosity,
+        skipSanityCheck = wfc.skipSanityCheck,
+        stopAfterRead = wfc.stopAfterRead,
+        stopAfterPrepare = wfc.stopAfterPrepare,
+        sparkEnv = WorkflowParams().sparkEnv ++ customSparkConf)
+
       // Evaluator Not Specified. Do training.
       if (!engine.isInstanceOf[Engine[_,_,_,_,_,_]]) {
         throw new NoSuchMethodException(s"Engine $engine is not trainable")
@@ -220,7 +215,7 @@ object CreateWorkflow extends Logging {
       val trainableEngine = engine.asInstanceOf[Engine[_, _, _, _, _, _]]
 
       val engineParams = if (wfc.engineParamsKey == "") {
-        trainableEngine.jValueToEngineParams(variantJson)
+        trainableEngine.jValueToEngineParams(variantJson, wfc.jsonExtractor)
       } else {
         engineFactoryObj.engineParams(wfc.engineParamsKey)
       }
@@ -234,13 +229,17 @@ object CreateWorkflow extends Logging {
         engineVersion = wfc.engineVersion,
         engineVariant = variantId,
         engineFactory = engineFactory,
-        batch = if (wfc.batch == "") engineFactory else wfc.batch,
+        batch = wfc.batch,
         env = pioEnvVars,
         sparkConf = workflowParams.sparkEnv,
-        dataSourceParams = JsonExtractor.paramToJson(Both, engineParams.dataSourceParams),
-        preparatorParams = JsonExtractor.paramToJson(Both, engineParams.preparatorParams),
-        algorithmsParams = JsonExtractor.paramsToJson(Both, engineParams.algorithmParamsList),
-        servingParams = JsonExtractor.paramToJson(Both, engineParams.servingParams))
+        dataSourceParams =
+          JsonExtractor.paramToJson(wfc.jsonExtractor, engineParams.dataSourceParams),
+        preparatorParams =
+          JsonExtractor.paramToJson(wfc.jsonExtractor, engineParams.preparatorParams),
+        algorithmsParams =
+          JsonExtractor.paramsToJson(wfc.jsonExtractor, engineParams.algorithmParamsList),
+        servingParams =
+          JsonExtractor.paramToJson(wfc.jsonExtractor, engineParams.servingParams))
 
       val engineInstanceId = Storage.getMetaDataEngineInstances.insert(
         engineInstance)
@@ -252,6 +251,12 @@ object CreateWorkflow extends Logging {
         engineParams = engineParams,
         engineInstance = engineInstance.copy(id = engineInstanceId))
     } else {
+      val workflowParams = WorkflowParams(
+        verbose = wfc.verbosity,
+        skipSanityCheck = wfc.skipSanityCheck,
+        stopAfterRead = wfc.stopAfterRead,
+        stopAfterPrepare = wfc.stopAfterPrepare,
+        sparkEnv = WorkflowParams().sparkEnv)
       val evaluationInstance = EvaluationInstance(
         evaluationClass = wfc.evaluationClass.get,
         engineParamsGeneratorClass = wfc.engineParamsGeneratorClass.get,

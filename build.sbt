@@ -18,11 +18,11 @@ import UnidocKeys._
 
 name := "pio"
 
-version in ThisBuild := "0.9.3-SNAPSHOT"
+version in ThisBuild := "0.9.5-SNAPSHOT"
 
 organization in ThisBuild := "io.prediction"
 
-scalaVersion in ThisBuild := "2.10.4"
+scalaVersion in ThisBuild := "2.10.5"
 
 scalacOptions in ThisBuild ++= Seq("-deprecation", "-unchecked", "-feature")
 
@@ -64,7 +64,7 @@ lazy val common = (project in file("common")).
 
 lazy val core = (project in file("core")).
   dependsOn(data).
-  //settings(genjavadocSettings: _*).
+  settings(genjavadocSettings: _*).
   settings(pioBuildInfoSettings: _*).
   settings(sonatypeSettings: _*).
   enablePlugins(SbtTwirl).
@@ -72,6 +72,7 @@ lazy val core = (project in file("core")).
 
 lazy val data = (project in file("data")).
   dependsOn(common).
+  settings(genjavadocSettings: _*).
   settings(sonatypeSettings: _*).
   settings(unmanagedClasspath in Test += conf)
 
@@ -82,19 +83,18 @@ lazy val tools = (project in file("tools")).
   settings(unmanagedClasspath in Test += conf)
 
 lazy val e2 = (project in file("e2")).
+  settings(genjavadocSettings: _*).
   settings(sonatypeSettings: _*).
   settings(unmanagedClasspath in Test += conf)
 
-//scalaJavaUnidocSettings
-scalaUnidocSettings
+scalaJavaUnidocSettings
 
-/*
+// scalaUnidocSettings
+
 unidocAllSources in (JavaUnidoc, unidoc) := {
   (unidocAllSources in (JavaUnidoc, unidoc)).value
     .map(_.filterNot(_.getName.contains("$")))
-    .map(_.filterNot(_.getCanonicalPath.contains("engines")))
 }
-*/
 
 scalacOptions in (ScalaUnidoc, unidoc) ++= Seq(
   "-groups",
@@ -105,43 +105,52 @@ scalacOptions in (ScalaUnidoc, unidoc) ++= Seq(
     "html",
     "io.prediction.annotation",
     "io.prediction.controller.html",
-    "io.prediction.controller.java",
-    "io.prediction.core",
     "io.prediction.data.api",
-    "io.prediction.data.examples",
-    "io.prediction.data.storage.elasticsearch",
-    "io.prediction.data.storage.examples",
-    "io.prediction.data.storage.hbase",
-    "io.prediction.data.storage.hdfs",
-    "io.prediction.data.storage.localfs",
-    "io.prediction.data.storage.mongodb",
     "io.prediction.data.view",
-    "io.prediction.engines",
     "io.prediction.workflow",
     "io.prediction.tools",
     "org",
     "scalikejdbc").mkString(":"),
   "-doc-title",
-  "PredictionIO Scaladoc",
+  "PredictionIO Scala API",
   "-doc-version",
   version.value,
   "-doc-root-content",
   "docs/scaladoc/rootdoc.txt")
 
-/*
 javacOptions in (JavaUnidoc, unidoc) := Seq(
+  "-subpackages",
+  "io.prediction",
+  "-exclude",
+  Seq(
+    "io.prediction.controller.html",
+    "io.prediction.data.api",
+    "io.prediction.data.view",
+    "io.prediction.data.webhooks.*",
+    "io.prediction.workflow",
+    "io.prediction.tools",
+    "org.apache.hadoop").mkString(":"),
   "-windowtitle",
   "PredictionIO Javadoc " + version.value,
   "-group",
   "Java Controllers",
-  "io.prediction.controller.java",
+  Seq(
+    "io.prediction.controller.java",
+    "io.prediction.data.store.java").mkString(":"),
+  "-group",
+  "Scala Base Classes",
+  Seq(
+    "io.prediction.controller",
+    "io.prediction.core",
+    "io.prediction.data.storage",
+    "io.prediction.data.storage.*",
+    "io.prediction.data.store").mkString(":"),
   "-overview",
   "docs/javadoc/javadoc-overview.html",
   "-noqualifier",
   "java.lang")
-*/
 
-lazy val pioUnidoc = taskKey[Unit]("Builds PredictionIO Scaladoc and Javadoc")
+lazy val pioUnidoc = taskKey[Unit]("Builds PredictionIO ScalaDoc and Javadoc")
 
 pioUnidoc := {
   (unidoc in Compile).value

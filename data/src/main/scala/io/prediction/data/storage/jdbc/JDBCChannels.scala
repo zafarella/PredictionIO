@@ -21,81 +21,40 @@ import io.prediction.data.storage.Channels
 import io.prediction.data.storage.StorageClientConfig
 import scalikejdbc._
 
+/** JDBC implementation of [[Channels]] */
 class JDBCChannels(client: String, config: StorageClientConfig, prefix: String)
   extends Channels with Logging {
+  /** Database table name for this data access object */
   val tableName = JDBCUtils.prefixTableName(prefix, "channels")
   DB autoCommit { implicit session =>
-    try {
-      sql"""
-      create table $tableName (
-        id serial not null primary key,
-        name text not null,
-        appid integer not null)""".execute().apply()
-    } catch {
-      case e: Exception => debug(e.getMessage, e) // assume table already exists
-    }
+    sql"""
+    create table if not exists $tableName (
+      id serial not null primary key,
+      name text not null,
+      appid integer not null)""".execute().apply()
   }
 
   def insert(channel: Channel): Option[Int] = DB localTx { implicit session =>
-    try {
-      val q = if (channel.id == 0)
-        sql"INSERT INTO $tableName (name, appid) VALUES(${channel.name}, ${channel.appid})"
-      else
-        sql"INSERT INTO $tableName VALUES(${channel.id}, ${channel.name}, ${channel.appid})"
-      Some(q.updateAndReturnGeneratedKey().apply().toInt)
-    } catch {
-      case e: Exception =>
-        error(e.getMessage, e)
-        None
+    val q = if (channel.id == 0) {
+      sql"INSERT INTO $tableName (name, appid) VALUES(${channel.name}, ${channel.appid})"
+    } else {
+      sql"INSERT INTO $tableName VALUES(${channel.id}, ${channel.name}, ${channel.appid})"
     }
+    Some(q.updateAndReturnGeneratedKey().apply().toInt)
   }
 
   def get(id: Int): Option[Channel] = DB localTx { implicit session =>
-    try {
-      sql"SELECT id, name, appid FROM $tableName WHERE id = $id".
-        map(resultToChannel).single().apply()
-    } catch {
-      case e: Exception =>
-        error(e.getMessage, e)
-        None
-    }
+    sql"SELECT id, name, appid FROM $tableName WHERE id = $id".
+      map(resultToChannel).single().apply()
   }
 
   def getByAppid(appid: Int): Seq[Channel] = DB localTx { implicit session =>
-    try {
-      sql"SELECT id, name, appid FROM $tableName WHERE appid = $appid".
-        map(resultToChannel).list().apply()
-    } catch {
-      case e: Exception =>
-        error(e.getMessage, e)
-        Seq()
-    }
+    sql"SELECT id, name, appid FROM $tableName WHERE appid = $appid".
+      map(resultToChannel).list().apply()
   }
 
-  def update(channel: Channel): Boolean = DB localTx { implicit session =>
-    try {
-      sql"""
-      UPDATE $tableName SET
-        name = ${channel.name},
-        appid = ${channel.appid}
-      WHERE id = ${channel.id}""".update().apply()
-      true
-    } catch {
-      case e: Exception =>
-        error(e.getMessage, e)
-        false
-    }
-  }
-
-  def delete(id: Int): Boolean = DB localTx { implicit session =>
-    try {
-      sql"DELETE FROM $tableName WHERE id = $id".update().apply()
-      true
-    } catch {
-      case e: Exception =>
-        error(e.getMessage, e)
-        false
-    }
+  def delete(id: Int): Unit = DB localTx { implicit session =>
+    sql"DELETE FROM $tableName WHERE id = $id".update().apply()
   }
 
   def resultToChannel(rs: WrappedResultSet): Channel = {

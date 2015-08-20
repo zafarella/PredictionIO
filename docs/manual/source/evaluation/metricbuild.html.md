@@ -13,7 +13,7 @@ A simplistic form of metric is a function which takes a
 `(Query, PredictedResult, ActualResult)`-tuple (*QPA-tuple*) as input
 and return a score. 
 Exploiting this properties allows us to implement custom metric with a single
-line of code (plus some boilder plates). We demonstate this with two metrics:
+line of code (plus some boilerplates). We demonstate this with two metrics:
 accuracy and precision.
 
 <!--
@@ -58,7 +58,7 @@ $ pio eval org.template.classification.AccuracyEvaluation \
 (See MyClassification/src/main/scala/***Evaluation.scala*** for full usage.)
 
 
-## Exmaple 2: Precision Metric
+## Example 2: Precision Metric
 
 Precision is a metric for binary classifier 
 capturing the portion of correction prediction among 

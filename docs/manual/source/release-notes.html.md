@@ -2,28 +2,62 @@
 title: Release Notes and News
 ---
 
+INFO: For upgrade instructions please refer to [this page](/resources/upgrade/).
+
 ### What's New
 
-0.9 Release | March 4th, 2015
+0.9.4 Release | July 16th, 2015 | [Release Notes](https://predictionio.atlassian.net/jira/secure/ReleaseNote.jspa?projectId=10000&version=13700)
 
+- Support event permissions with different access keys at the Event Server interface
 
-- [Ecommerce Recommmendation Template](http://templates.prediction.io/repositories/7) which includes 1) out-of-stock items support 2) new user recommendation 3) unseen items only. 
+- Support detection of 3rd party Apache Spark distributions
 
-- [Complimentry Purcahse Template](http://templates.prediction.io/repositories/11) for shopping cart recommendation.
+- Support running `pio eval` without `engine.json`
 
-- [Lead Scoring Template](http://templates.prediction.io/repositories/10) predicts the probability of an user will convert in the current session.
+- Fix an issue where `--verbose` is not handled properly by `pio train`
 
-- start-all, stop-all commands to start and stop all PredictionIO related services. 
+0.9.3 Release | May 20th, 2015 | [Release Notes](https://predictionio.atlassian.net/jira/secure/ReleaseNote.jspa?projectId=10000&version=13600)
 
-0.8.6 | Feb 10th, 2015
+- Add support of developing prediction engines in Java
 
-- New engine template - [Product Ranking](/../templates/productranking/quickstart/) for personalized product listing. 
+- Add support of PostgreSQL and MySQL
 
-- [CloudFormation deployment](/../production/deploy-cloudformation/) available. 
+- Spark 1.3.1 compatibility fix
 
-### Release Notes
+- Creation of specific app access keys
 
-PredictionIO v0.9 | [Release Note](https://predictionio.atlassian.net/jira/secure/ReleaseNote.jspa?projectId=10000&version=13400)
+- Prevent a case where `pio build` accidentally removes PredictionIO core library
 
+0.9.2 Release | April 14th, 2015 | [Release Notes](https://predictionio.atlassian.net/jira/secure/ReleaseNote.jspa?projectId=10000&version=13500)
 
-PredictionIO v0.8.6 | [Release Note](https://predictionio.atlassian.net/jira/secure/ReleaseNote.jspa?projectId=10000&version=13300)
+- Channels in the Event Server
+
+- Spark 1.3+ support (upgrade to Spark 1.3+ required)
+
+- [Webhook Connector](http://docs.prediction.io/community/contribute-webhook/) support
+
+- Engine and Event Servers now by default bind to 0.0.0.0
+
+- Many documentation improvements
+
+0.9.1 Release | March 17th, 2015 | [Releaes Notes](https://predictionio.atlassian.net/jira/secure/ReleaseNote.jspa?projectId=10000&version=13401)
+
+- Improved `pio-start-all`
+
+- Fixed a bug where `pio build` failed to set PredictionIO dependency version for engine templates
+
+0.9.0 Release | March 4th, 2015 | [Release Notes](https://predictionio.atlassian.net/jira/secure/ReleaseNote.jspa?projectId=10000&version=13400)
+
+- [E-Commerce Recommendation Template](http://templates.prediction.io/PredictionIO/template-scala-parallel-ecommercerecommendation) which includes 1) out-of-stock items support 2) new user recommendation 3) unseen items only
+
+- [Complementary Purchase Template](http://templates.prediction.io/PredictionIO/template-scala-parallel-complementarypurchase) for shopping cart recommendation
+
+- [Lead Scoring Template](http://templates.prediction.io/PredictionIO/template-scala-parallel-leadscoring) predicts the probability of an user will convert in the current session
+
+- `pio-start-all`, `pio-stop-all` commands to start and stop all PredictionIO related services
+
+0.8.6 | Feb 10th, 2015 | [Release Notes](https://predictionio.atlassian.net/jira/secure/ReleaseNote.jspa?projectId=10000&version=13300)
+
+- New engine template - [Product Ranking](/templates/productranking/quickstart/) for personalized product listing
+
+- [CloudFormation deployment](/system/deploy-cloudformation/) available
